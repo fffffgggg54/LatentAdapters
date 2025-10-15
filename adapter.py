@@ -135,7 +135,7 @@ class Adapter(nn.Module):
         all_embeds = self.fw_latent_to_all_embeds(latents)
         # output shape of N * [N, B, d_out]
         # out_model, in_model, batch_idx, dim
-        return x
+        return all_embeds
 
     def fw_self_cycle_embeds(self, adapted_embeds):
         # N * [N, B, d_cycle]

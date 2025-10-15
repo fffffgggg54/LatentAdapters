@@ -73,7 +73,6 @@ embeds_train = [
         map_location='cpu'
     ).to(torch.bfloat16) for model in tqdm.tqdm(models)
 ]
-labels_train = torch.load('embeds/labels_in1k_train.pt')
 
 embeds_val = [
     torch.load(
@@ -82,13 +81,6 @@ embeds_val = [
     ) for model in models
 ]
 
-# FIXME these are all the same
-labels_val = [
-    torch.load(
-        f'embeds/labels_in1k_val_{model.default_cfg['architecture']}.{model.default_cfg['tag']}.pt',
-        map_location='cpu'
-    ) for model in models
-]
 
 class EmbeddingDataset(torch.utils.data.Dataset):
     def __init__(self, embedsList):
@@ -141,7 +133,6 @@ scheduler_dc = optim.lr_scheduler.OneCycleLR(
 )
 
 embeds_val = [embed.to(device) for embed in embeds_val]
-labels_val = [label.to(device) for label in labels_val]
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 aug_strength = 0.8
@@ -158,7 +149,7 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [(embed + (torch.randn_like(embed) * aug_strength * embed.std(dim=0)).detach()).float() for embed in embeds],
-                dc_ce=0.3
+                dc_ce=0.0
             )
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -186,7 +177,7 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [embed.float() for embed in embeds],
-                dc_ce = 0.3
+                dc_ce = 0.0
             )
             loss_val = loss_val + loss * bs_val
             loss_dc_val = loss_dc_val + loss_dc * bs_val
@@ -197,12 +188,12 @@ for i in range(num_epochs):
     loss_val = loss_val / len(embeds_val[0])
     loss_dc_val = loss_dc_val / len(embeds_val[0])
     dc_acc_val = 100 * dc_correct_val / len(embeds_val[0])
-    print(f'iter {i}: train loss: {loss_train.item()}, train dc loss: {loss_dc_train.item()}, train dc acc: {["{:.4f}".format(x) for x in dc_acc_train]},', sep="")
+    print(f'iter {i}: train loss: {loss_train.item()}, train dc loss: {loss_dc_train.item()}, train dc acc: {["{:.4f}".format(x) for x in dc_acc_train]}, ', end="")
     print(f'val loss: {loss_val.item()}, val dc loss: {loss_dc_val.item()}, val dc acc: {["{:.4f}".format(x) for x in dc_acc_val]}')
 
 
     # TODO proper output directory handling
     create_dir('adapters')
-    torch.save(adapter, f'adapters/adapter_{timestamp}_epoch_{i}.pt')
+    torch.save(adapter.state_dict(), f'adapters/adapter_latent_mse_no_discriminator_{timestamp}_epoch_{i}.pt')
     if(i > 0):
         os.remove(f'adapters/adapter_{timestamp}_epoch_{i-1}.pt')
