@@ -196,4 +196,4 @@ for i in range(num_epochs):
     create_dir('adapters')
     torch.save(adapter.state_dict(), f'adapters/adapter_latent_mse_no_discriminator_{timestamp}_epoch_{i}.pt')
     if(i > 0):
-        os.remove(f'adapters/adapter_{timestamp}_epoch_{i-1}.pt')
+        os.remove(f'adapters/adapter_latent_mse_no_discriminator_{timestamp}_epoch_{i}.pt')
