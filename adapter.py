@@ -152,6 +152,9 @@ class Adapter(nn.Module):
             cycle_latent = self.fw_one_embed_to_latent(adapted_embeds[i], model_name)
             cycle_latents.append(cycle_latent)
 
+        # N * [N, B, d_hidden]
+        # cycle_model, in_model, batch_idx, dim
+
         # [N, N, B, d_hidden]
         # in_model, cycle_model, batch_idx, dim
         cycle_latents = torch.stack(cycle_latents, dim=1)
@@ -161,7 +164,7 @@ class Adapter(nn.Module):
         for i, model_name in enumerate(self.model_names):
             # [N, B, d_hidden] -> [N, B, d_in]
             # cycle_model, batch_idx, dim
-            self_cycle_embed = self.fw_latent_to_one_embed(cycle_latent[i], model_name)
+            self_cycle_embed = self.fw_latent_to_one_embed(cycle_latents[i], model_name)
             self_cycle_embeds.append(self_cycle_embed)
 
         # N * [N, B, d_in]

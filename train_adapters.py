@@ -25,6 +25,8 @@ import os
 from adapter import Adapter
 import losses
 
+out_dir = "outputs/basic_discriminator0.3_latent1.0_normMSEvar/"
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
@@ -149,7 +151,7 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [(embed + (torch.randn_like(embed) * aug_strength * embed.std(dim=0)).detach()).float() for embed in embeds],
-                dc_ce=0.0
+                dc_ce=0.3
             )
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -177,7 +179,7 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [embed.float() for embed in embeds],
-                dc_ce = 0.0
+                dc_ce = 0.3
             )
             loss_val = loss_val + loss * bs_val
             loss_dc_val = loss_dc_val + loss_dc * bs_val
@@ -193,7 +195,7 @@ for i in range(num_epochs):
 
 
     # TODO proper output directory handling
-    create_dir('adapters')
-    torch.save(adapter.state_dict(), f'adapters/adapter_latent_mse_no_discriminator_{timestamp}_epoch_{i}.pt')
+    create_dir(out_dir)
+    torch.save(adapter.state_dict(), out_dir + f'adapter_epoch_{i}.pt')
     if(i > 0):
-        os.remove(f'adapters/adapter_latent_mse_no_discriminator_{timestamp}_epoch_{i}.pt')
+        os.remove(out_dir + f'adapter_epoch_{i-1}.pt')
