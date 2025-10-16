@@ -92,7 +92,89 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
-def count_correct(models, adapter, embeds_val, labels_val):
+def compute_latents(embeds, adapter, bs=1000):
+    embeds_ds = EmbeddingDataset(embeds)
+    loader_train = torch.utils.data.DataLoader(embeds_ds, batch_size=bs, num_workers=8, shuffle=False)
+    all_latents = []
+    for embeds in tqdm.tqdm(loader):
+        embeds = [embed.to(device, non_blocking=True) for embed in embeds]
+        with torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
+            with torch.autograd.grad_mode.inference_mode():
+                # [N, B, d_h]
+                latents = adapter.fw_all_embeds_to_latent(embeds)
+                all_latents.append(latents.to('cpu', non_blocking=True))
+    #with torch.autograd.grad_mode.inference_mode():
+    #    latents = torch.cat(all_latents, dim=1)
+    return latents
+
+def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None, shared=False):
+    emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
+    emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
+    bs_train = bs or 2**14
+    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=16, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=2)
+    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=16, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=2)
+    # FIXME hardcoded class count
+    if shared:
+        # N * [B, d_hidden]
+        probes = nn.Linear(embeds_train[0].shape[1], 1000).to(device)
+    else:
+        # N * [B, d_model]
+        probes = nn.ModuleList([nn.Linear(embed.shape[1], 1000) for embed in embeds_train]).to(device)
+    optimizer = timm.optim.Adan(probes.parameters(), lr=lr, weight_decay=1e-5)
+    scaler = torch.amp.GradScaler('cuda')
+    criterion = nn.CrossEntropyLoss()
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=len(loader_train), epochs=epochs, pct_start=0.1)
+    for epoch in range(epochs):
+        correct_train = 0
+        total_train = 0
+        correct_val = 0
+        total_val = 0
+        for embedBatch in loader_train:
+            with torch.autocast(device.type, dtype=autocast_dtype):
+                embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
+                labelBatch = embedBatch[0]
+                embedBatch = embedBatch[1:]
+                # noise aug
+                with torch.no_grad():
+                    embedBatch = [embed + torch.randn_like(embed) * aug_strength * embed.std(dim=0) for embed in embedBatch]
+                optimizer.zero_grad()
+                if shared:
+                    outputs = probes(torch.stack(embedBatch, dim=0))
+                else:
+                    outputs = [probe(embed).float() for probe, embed in zip(probes, embedBatch)]
+                loss = torch.stack([criterion(output, labelBatch) for output in outputs])
+                loss = loss.mean()
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                scaler.step(optimizer)
+                scaler.update()
+                scheduler.step()
+                correct_train = correct_train + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
+                total_train += len(labelBatch)
+        for embedBatch in loader_val:
+            with torch.autocast(device.type, dtype=autocast_dtype):
+                with torch.inference_mode():
+                    embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
+                    labelBatch = embedBatch[0]
+                    embedBatch = embedBatch[1:]
+                    if shared:
+                        outputs = probes(torch.stack(embedBatch, dim=0))
+                    else:
+                        outputs = [probe(embed).float() for probe, embed in zip(probes, embedBatch)]
+                    correct_val = correct_val + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
+                    total_val += len(labelBatch)
+
+        print(f'Epoch {epoch+1}: Train Accuracy: {correct_train/total_train}, Val Accuracy: {correct_val/total_val}')
+    return probes, correct_val/total_val
+
+def count_correct(models, adapter, labels_val, shared=False, embeds=None, latents=None):
+    # case stock heads: models is list of models, shared=False, embeds=list of embeds, latents=None
+    # case embedding probes: models is modulelist of probes, shared=False, embeds=list of embeds, latents=None
+    # case latent probes: models is modulelist of probes, shared=False, embeds=None, latents=list of latents
+    # case shared latent probe: models is latent probe, shared=True, embeds=None, latents=list of latents
+
+    assert (embeds is not None) ^ (latents is not None), "You must provide either latents or embeds, but not both"
+
     bs_val = 2000
     # no translation, own head
     correct_default = torch.zeros(len(models), device=device)
@@ -103,39 +185,60 @@ def count_correct(models, adapter, embeds_val, labels_val):
     # translate self -> other -> self
     # self, other
     correct_cycle = torch.zeros(len(models), len(models), device=device)
-    # no translation, other head
-    #correct_naive = 0
+
     total = 0
 
-    # N * [B, d_n]
+    # N * [B, d_model]
     embeds_val = [embed.to(device) for embed in embeds_val]
-    # N * [B]
+    # [B]
     labels_val = labels_val.to(device)
 
     for embeds, labels in zip(zip(*[torch.split(x, bs_val, 0) for x in embeds_val]), torch.split(labels_val, bs_val, 0)):
         with torch.no_grad():
-            # output shape of N * [N, B, d_out]
-            # out_model, in_model, batch_idx, dim
-            adapted_embeds = adapter.adapt_all_to_all(embeds)
+            if embeds is not None:
+                # output shape of N * [N, B, d_out]
+                # out_model, in_model, batch_idx, dim
+                adapted_embeds = adapter.adapt_all_to_all(embeds)
 
-            # N * [N, B, d_in]
-            # in_model, cycle_model, batch_idx, dim 
-            self_cycle_embeds = adapter.fw_self_cycle_embeds(adapted_embeds)
+                # N * [N, B, d_in]
+                # in_model, cycle_model, batch_idx, dim 
+                self_cycle_embeds = adapter.fw_self_cycle_embeds(adapted_embeds)
 
-            correct_default += torch.stack([(labels == torch.argmax(fw_head(model.float(), embed.float()), dim=1)).sum() for model, embed in zip(models, embeds)], dim=0)
+                correct_default += torch.stack([(labels == torch.argmax(fw_head(model.float(), embed.float()), dim=1)).sum() for model, embed in zip(models, embeds)], dim=0)
 
-            # stride on out_model, stack on dim 1 for in_model, out_model
-            correct_adapted += torch.stack([(labels.unsqueeze(0) == torch.argmax(fw_head(model.float(), embed.float()), dim=-1)).sum(-1) for model, embed in zip(models, adapted_embeds)], dim=1)
+                # stride on out_model, stack on dim 1 for in_model, out_model
+                correct_adapted += torch.stack([(labels.unsqueeze(0) == torch.argmax(fw_head(model.float(), embed.float()), dim=-1)).sum(-1) for model, embed in zip(models, adapted_embeds)], dim=1)
 
-            # stride on self, stack on dim 0 for self, other
-            correct_cycle += torch.stack([(labels.unsqueeze(0) == torch.argmax(fw_head(model.float(), embed.float()), dim=-1)).sum(-1) for model, embed in zip(models, self_cycle_embeds)], dim=0)
+                # stride on self, stack on dim 0 for self, other
+                correct_cycle += torch.stack([(labels.unsqueeze(0) == torch.argmax(fw_head(model.float(), embed.float()), dim=-1)).sum(-1) for model, embed in zip(models, self_cycle_embeds)], dim=0)
+            else:
+                # [N, B, d_hidden]
+                embeds = torch.stack(embeds, dim=0)
+                adapted_embeds = adapter.fw_latent_to_all_embeds(embeds)
+                cycle_latents = adapter.fw_cycle_latents(adapted_embeds)
+                if shared:
+                    outputs = models(torch.stack(embeds, dim=0))
+                    # stride on out_model, stack on dim 1 for in_model, out_model
+                    correct_adapted += (labels == torch.argmax(models(embeds), dim=2)).sum(1).unsqueeze(1)
 
+                    # stride on self, stack on dim 0 for self, other
+                    correct_cycle += torch.stack([(labels == torch.argmax(model(embed), dim=2)).sum(1) for embed in cycle_latents], dim=0)
+                else:
+                    outputs = [model(embed).float() for model, embed in zip(models, embeds)]
+                    correct_default += torch.stack([(labels == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
+
+                    # stride on out_model, stack on dim 1 for in_model, out_model
+                    correct_adapted += torch.stack([(labels == torch.argmax(model(embeds), dim=2)).sum(1) for model in models], dim=1)
+
+                    # stride on self, stack on dim 0 for self, other
+                    correct_cycle += torch.stack([(labels == torch.argmax(probe(latent), dim=2)).sum(1) for probe, latent in zip(probes_for_latents, cycle_latents)], dim=0)
+                
             total += len(labels)
     print(f'default: {correct_default/total}, adapted: {correct_adapted/total}, cycle: {correct_cycle/total}')
     return correct_default, correct_adapted, correct_cycle, total
 
 def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(models, adapter, embeds_val, labels_val)
+    correct_default, correct_adapted, correct_cycle, total = count_correct(models, adapter, labels_val, embeds = embeds_val)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -228,57 +331,11 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         out_file = "outputs/cls_adapter_with_stock_head_cycle_vs_no_adapt.png"
     )
 
-def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None):
-    emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
-    emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
-    bs_train = bs or 2**14
-    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=16, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=2)
-    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=16, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=2)
-    # FIXME hardcoded class count
-    probes = nn.ModuleList([nn.Linear(embed.shape[1], 1000) for embed in embeds_train]).to(device)
-    optimizer = timm.optim.Adan(probes.parameters(), lr=lr, weight_decay=1e-5)
-    scaler = torch.amp.GradScaler('cuda')
-    criterion = nn.CrossEntropyLoss()
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=len(loader_train), epochs=epochs, pct_start=0.1)
-    for epoch in range(epochs):
-        correct_train = 0
-        total_train = 0
-        correct_val = 0
-        total_val = 0
-        for embedBatch in loader_train:
-            with torch.autocast(device.type, dtype=autocast_dtype):
-                embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
-                labelBatch = embedBatch[0]
-                embedBatch = embedBatch[1:]
-                # noise aug
-                with torch.no_grad():
-                    embedBatch = [embed + torch.randn_like(embed) * aug_strength * embed.std(dim=0) for embed in embedBatch]
-                optimizer.zero_grad()
-                outputs = [probe(embed).float() for probe, embed in zip(probes, embedBatch)]
-                loss = torch.stack([criterion(output, labelBatch) for output in outputs])
-                loss = loss.mean()
-                scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
-                scaler.step(optimizer)
-                scaler.update()
-                scheduler.step()
-                correct_train = correct_train + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
-                total_train += len(labelBatch)
-        for embedBatch in loader_val:
-            with torch.autocast(device.type, dtype=autocast_dtype):
-                with torch.inference_mode():
-                    embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
-                    labelBatch = embedBatch[0]
-                    embedBatch = embedBatch[1:]
-                    outputs = [probe(embed).float() for probe, embed in zip(probes, embedBatch)]
-                    correct_val = correct_val + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
-                    total_val += len(labelBatch)
+    return correct_default, correct_adapted, correct_cycle, total
 
-        print(f'Epoch {epoch+1}: Train Accuracy: {correct_train/total_train}, Val Accuracy: {correct_val/total_val}')
-    return probes, correct_val/total_val
 
 def eval_cls_with_embedding_probes(probes, adapter, embeds_val, labels_val):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, embeds_val, labels_val)
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, labels_val, embeds = embeds_val)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -294,24 +351,57 @@ def eval_cls_with_embedding_probes(probes, adapter, embeds_val, labels_val):
         model_names, 
         "Top-1 Accuracy adapting to embedding probes", 
         "Top-1 Accuracy",
-        x_label = "Backbone of linear probe",
+        x_label = "Backbone of embedding probe",
         out_file = "outputs/cls_adapter_with_embedding_probes.png"
     )
 
-def compute_latents(embeds, adapter, bs=1000):
-    embeds_ds = EmbeddingDataset(embeds)
-    loader_train = torch.utils.data.DataLoader(embeds_ds, batch_size=bs, num_workers=8, shuffle=False)
-    all_latents = []
-    for embeds in tqdm.tqdm(loader):
-        embeds = [embed.to(device, non_blocking=True) for embed in embeds]
-        with torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
-            with torch.autograd.grad_mode.inference_mode():
-                # [N, B, d_h]
-                latents = adapter.fw_all_embeds_to_latent(embeds)
-                all_latents.append(latents.to('cpu', non_blocking=True))
-    with torch.autograd.grad_mode.inference_mode():
-        latents = torch.cat(all_latents, dim=1)
-    return latents
+    return correct_default, correct_adapted, correct_cycle, total
+
+def eval_cls_with_latent_probes(probes, adapter, latents_val, labels_val):
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, labels_val, latents = latents_val)
+
+    top1_adapted = correct_adapted/total
+    top1_default = correct_default/total
+    top1_cycle = correct_cycle/total
+
+    
+    plot_heatmap(
+        top1_adapted.cpu().numpy(), 
+        model_names, 
+        "Top-1 Accuracy Adapting to Latent Linear Probes", 
+        "Top-1 Accuracy",
+        x_label = "Backbone of latent probe",
+        out_file = "outputs/cls_adapter_with_latent_probes.png"
+    )
+
+    return correct_default, correct_adapted, correct_cycle, total
+
+def eval_cls_with_shared_latent_probe(probe, adapter, latents_val, labels_val, top1_adapted_probes):
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probe, adapter, labels_val, latents = latents_val, shared=True)
+
+    top1_adapted = correct_adapted/total
+    top1_default = correct_default/total
+    top1_cycle = correct_cycle/total
+
+    plot_heatmap(
+        top1_adapted[:,0].unsqueeze(0).cpu().numpy(),
+        model_names,
+        "Top-1 Accuracy of Shared Latent Linear Probe", 
+        "Top-1 Accuracy",
+        y_label = None,
+        out_file = "outputs/cls_adapter_with_shared_latent_probe.png"
+    )
+
+    plot_heatmap(
+        (top1_adapted[:,0].unsqueeze(1) - top1_adapted_probes).cpu().numpy(),
+        model_names,
+        "Top-1 Accuracy Change from Non-shared Adapter Probes to Shared Latent Probe",
+        "Top-1 Accuracy",
+        x_label = "Backbone of latent probe",
+        out_file = "outputs/cls_adapter_with_shared_latent_probe_vs_separate_latent_probes.png"
+    )
+
+    return correct_default, correct_adapted, correct_cycle, total
 
 if __name__ == '__main__':
     # TODO unnecesary, figure out a way to get embed dim/head without instantiating and loading weights for the whole model
@@ -360,3 +450,24 @@ if __name__ == '__main__':
         epochs = 20, 
         bs=None
     )
+
+    eval_cls_with_embedding_probes(model_embedding_probes, adapter, embeds_val, labels_val)
+
+    latents_train = compute_latents(embeds_train, adapter)
+    latents_val = compute_latents(embeds_val, adapter)
+
+    latent_probes, _ = train_probe_on_embeddings(
+        latents_train, 
+        labels_train, 
+        latents_val, 
+        labels_val, 
+        lr=0.003, 
+        aug_strength = 0.6, 
+        epochs = 20, 
+        bs=None
+    )
+
+    latent_probe_results = eval_cls_with_latent_probes(latent_probes, adapter, latents_val, labels_val)
+    top1_adapted_probes = latent_probe_results[1]/latent_probe_results[3]
+
+    eval_cls_with_latent_probes(latent_probes, adapter, latents_val, labels_val, top1_adapted_probes)

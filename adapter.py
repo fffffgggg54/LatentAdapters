@@ -137,10 +137,9 @@ class Adapter(nn.Module):
         # out_model, in_model, batch_idx, dim
         return all_embeds
 
-    def fw_self_cycle_embeds(self, adapted_embeds):
+    def fw_cycle_latents(self, adapted_embeds):
         # N * [N, B, d_cycle]
         # cycle_model, in_model, batch_idx, dim
-        #[print(x.shape) for x in adapted_embeds]
 
         cycle_latents = []
         # index over cycle models
@@ -151,14 +150,14 @@ class Adapter(nn.Module):
             # in_model, batch_idx, dim
             cycle_latent = self.fw_one_embed_to_latent(adapted_embeds[i], model_name)
             cycle_latents.append(cycle_latent)
-
-        # N * [N, B, d_hidden]
-        # cycle_model, in_model, batch_idx, dim
-
         # [N, N, B, d_hidden]
         # in_model, cycle_model, batch_idx, dim
         cycle_latents = torch.stack(cycle_latents, dim=1)
+        return cycle_latents
 
+    def fw_cycle_latents_to_self_cycle_embeds(self, cycle_latents):
+        # [N, N, B, d_hidden]
+        # in_model, cycle_model, batch_idx, dim
         self_cycle_embeds = []
         # index over input models
         for i, model_name in enumerate(self.model_names):
@@ -166,7 +165,16 @@ class Adapter(nn.Module):
             # cycle_model, batch_idx, dim
             self_cycle_embed = self.fw_latent_to_one_embed(cycle_latents[i], model_name)
             self_cycle_embeds.append(self_cycle_embed)
+        # N * [N, B, d_in]
+        # in_model, cycle_model, batch_idx, dim        
+        return self_cycle_embeds
 
+
+    def fw_self_cycle_embeds(self, adapted_embeds):
+        # N * [N, B, d_cycle]
+        # cycle_model, in_model, batch_idx, dim
+        cycle_latents = self.fw_cycle_latents(adapted_embeds)
+        self_cycle_embeds = self.fw_cycle_latents_to_self_cycle_embeds(cycle_latents)
         # N * [N, B, d_in]
         # in_model, cycle_model, batch_idx, dim        
         return self_cycle_embeds
