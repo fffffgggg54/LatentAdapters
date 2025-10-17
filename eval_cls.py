@@ -22,7 +22,7 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_latent1.0_normMSEvar/"
+out_dir = "outputs/basic_discriminator0.3_latent1.0_MSE/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -85,7 +85,6 @@ def fw_head(model, x):
             # vit
             return model.head(x)
 
-
 class EmbeddingDataset(torch.utils.data.Dataset):
     def __init__(self, embedsList):
         self.embedsList = embedsList
@@ -94,28 +93,7 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
-'''
-def compute_latents(embeds, adapter, bs=1000):
-    #embeds_ds = EmbeddingDataset(embeds)
-    #loader = torch.utils.data.DataLoader(embeds_ds, batch_size=bs, num_workers=8, shuffle=False)
-    loader = zip(*[torch.split(x, bs, 0) for x in embeds])
-    #all_latents = []
-    all_latents = [torch.zeros(len(embeds[0]), adapter.hidden_dim, dtype=torch.float) for _ in embeds]
-    for i, embeds in enumerate(tqdm.tqdm(loader)):
-        embeds = [embed.to(device, non_blocking=True) for embed in embeds]
-        with torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
-            with torch.autograd.grad_mode.inference_mode():
-                # [N, B, d_h]
-                latents = adapter.fw_all_embeds_to_latent(embeds)
-                #all_latents.append(latents.to('cpu', non_blocking=True))
-                for idx in range(len(embeds)):
-                    start_index = i * bs
-                    end_index = start_index + len(latents[idx])
-                    all_latents[idx][start_index:end_index] = latents[idx].to('cpu', non_blocking=True)
-    #with torch.autograd.grad_mode.inference_mode():
-    #    latents = torch.cat(all_latents, dim=1)
-    return all_latents
-'''
+
 def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, use_latents=False, adapter=None, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None, shared=False):
     emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
     emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
@@ -451,9 +429,14 @@ if __name__ == '__main__':
     print(model_names)
     print([x[0].shape for x in embeds_train])
 
+    # in1k only
     print("\nstock head eval\n")
     eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val)
 
+    # for each probe dataset
+    # TODO everything after here should be in a foreach loop for sets of embeds/labels for each probe dataset
+    # TODO clip-based zero shot also goes here
+    # TODO early-fusion VLM zero shot also goes here
     print("\ntrain and evaluate embedding probes\n")
     # TODO impl model selection and hparam sweeps for probes like oai clip/other probe papers
     model_embedding_probes, _ = train_probe_on_embeddings(
@@ -466,9 +449,9 @@ if __name__ == '__main__':
         epochs = 20, 
         bs=None
     )
-
     eval_cls_with_embedding_probes(model_embedding_probes, adapter, embeds_val, labels_val)
 
+    # for each probe dataset
     print("\ntrain and evaluate non-shared latent probes")
     latent_probes, _ = train_probe_on_embeddings(
         embeds_train, 
@@ -482,10 +465,11 @@ if __name__ == '__main__':
         epochs = 20, 
         bs=None
     )
-
     latent_probe_results = eval_cls_with_latent_probes(latent_probes, adapter, embeds_val, labels_val)
+    # FIXME there has to be a better way to do this. Can we run all evals, then plot later with all outputs?
     top1_adapted_probes = latent_probe_results[1]/latent_probe_results[3]
 
+    # for each probe dataset
     print("\ntrain and evaluate shared latent probe")
     shared_latent_probe, _ = train_probe_on_embeddings(
         embeds_train, 
