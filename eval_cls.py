@@ -22,6 +22,8 @@ import os
 from adapter import Adapter
 import losses
 
+out_dir = "outputs/basic_discriminator0.3_latent1.0_normMSEvar/"
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
@@ -92,34 +94,43 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
+'''
 def compute_latents(embeds, adapter, bs=1000):
-    embeds_ds = EmbeddingDataset(embeds)
-    loader_train = torch.utils.data.DataLoader(embeds_ds, batch_size=bs, num_workers=8, shuffle=False)
-    all_latents = []
-    for embeds in tqdm.tqdm(loader):
+    #embeds_ds = EmbeddingDataset(embeds)
+    #loader = torch.utils.data.DataLoader(embeds_ds, batch_size=bs, num_workers=8, shuffle=False)
+    loader = zip(*[torch.split(x, bs, 0) for x in embeds])
+    #all_latents = []
+    all_latents = [torch.zeros(len(embeds[0]), adapter.hidden_dim, dtype=torch.float) for _ in embeds]
+    for i, embeds in enumerate(tqdm.tqdm(loader)):
         embeds = [embed.to(device, non_blocking=True) for embed in embeds]
         with torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
             with torch.autograd.grad_mode.inference_mode():
                 # [N, B, d_h]
                 latents = adapter.fw_all_embeds_to_latent(embeds)
-                all_latents.append(latents.to('cpu', non_blocking=True))
+                #all_latents.append(latents.to('cpu', non_blocking=True))
+                for idx in range(len(embeds)):
+                    start_index = i * bs
+                    end_index = start_index + len(latents[idx])
+                    all_latents[idx][start_index:end_index] = latents[idx].to('cpu', non_blocking=True)
     #with torch.autograd.grad_mode.inference_mode():
     #    latents = torch.cat(all_latents, dim=1)
-    return latents
-
-def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None, shared=False):
+    return all_latents
+'''
+def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, use_latents=False, adapter=None, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None, shared=False):
     emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
     emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
     bs_train = bs or 2**14
-    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=16, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=2)
-    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=16, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=2)
+    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=10, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=1)
+    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=10, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=1)
     # FIXME hardcoded class count
     if shared:
-        # N * [B, d_hidden]
-        probes = nn.Linear(embeds_train[0].shape[1], 1000).to(device)
+        probes = nn.Linear(adapter.hidden_dim, 1000).to(device)
     else:
-        # N * [B, d_model]
-        probes = nn.ModuleList([nn.Linear(embed.shape[1], 1000) for embed in embeds_train]).to(device)
+        if use_latents:
+            probes = nn.ModuleList([nn.Linear(adapter.hidden_dim, 1000) for embed in embeds_train]).to(device)
+        else:
+            # N * [B, d_model]
+            probes = nn.ModuleList([nn.Linear(embed.shape[1], 1000) for embed in embeds_train]).to(device)
     optimizer = timm.optim.Adan(probes.parameters(), lr=lr, weight_decay=1e-5)
     scaler = torch.amp.GradScaler('cuda')
     criterion = nn.CrossEntropyLoss()
@@ -134,6 +145,8 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
                 embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
                 labelBatch = embedBatch[0]
                 embedBatch = embedBatch[1:]
+                if use_latents:
+                    embedBatch = adapter.fw_all_embeds_to_latent(embedBatch)
                 # noise aug
                 with torch.no_grad():
                     embedBatch = [embed + torch.randn_like(embed) * aug_strength * embed.std(dim=0) for embed in embedBatch]
@@ -157,8 +170,12 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
                     embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
                     labelBatch = embedBatch[0]
                     embedBatch = embedBatch[1:]
+                    if use_latents:
+                        embedBatch = adapter.fw_all_embeds_to_latent(embedBatch)
                     if shared:
-                        outputs = probes(torch.stack(embedBatch, dim=0))
+                        #outputs = probes(torch.stack(embedBatch, dim=0))
+                        outputs = probes(embedBatch)
+                        # FIXME why not stack here??
                     else:
                         outputs = [probe(embed).float() for probe, embed in zip(probes, embedBatch)]
                     correct_val = correct_val + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
@@ -167,24 +184,23 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
         print(f'Epoch {epoch+1}: Train Accuracy: {correct_train/total_train}, Val Accuracy: {correct_val/total_val}')
     return probes, correct_val/total_val
 
-def count_correct(models, adapter, labels_val, shared=False, embeds=None, latents=None):
+def count_correct(models, adapter, embeds_val, labels_val, shared=False, use_latents=False):
+    # FIXME old and wrong!!
     # case stock heads: models is list of models, shared=False, embeds=list of embeds, latents=None
     # case embedding probes: models is modulelist of probes, shared=False, embeds=list of embeds, latents=None
     # case latent probes: models is modulelist of probes, shared=False, embeds=None, latents=list of latents
     # case shared latent probe: models is latent probe, shared=True, embeds=None, latents=list of latents
 
-    assert (embeds is not None) ^ (latents is not None), "You must provide either latents or embeds, but not both"
-
     bs_val = 2000
     # no translation, own head
-    correct_default = torch.zeros(len(models), device=device)
+    correct_default = torch.zeros(len(adapter.model_names), device=device)
     # translate to own/other embedding space
     # own on diagonal, other elsewhere
     # in_model, out_model
-    correct_adapted = torch.zeros(len(models), len(models), device=device)
+    correct_adapted = torch.zeros(len(adapter.model_names), len(adapter.model_names), device=device)
     # translate self -> other -> self
     # self, other
-    correct_cycle = torch.zeros(len(models), len(models), device=device)
+    correct_cycle = torch.zeros(len(adapter.model_names), len(adapter.model_names), device=device)
 
     total = 0
 
@@ -195,14 +211,31 @@ def count_correct(models, adapter, labels_val, shared=False, embeds=None, latent
 
     for embeds, labels in zip(zip(*[torch.split(x, bs_val, 0) for x in embeds_val]), torch.split(labels_val, bs_val, 0)):
         with torch.no_grad():
-            if embeds is not None:
-                # output shape of N * [N, B, d_out]
-                # out_model, in_model, batch_idx, dim
-                adapted_embeds = adapter.adapt_all_to_all(embeds)
+            latents = adapter.fw_all_embeds_to_latent(embeds)
+            adapted_embeds = adapter.fw_latent_to_all_embeds(latents)
+            cycle_latents = adapter.fw_cycle_latents(adapted_embeds)
+            if use_latents:
+                if shared:
+                    # FIXME probably should be default instead of adapted
+                    # stride on out_model, stack on dim 1 for in_model, out_model
+                    correct_adapted += (labels.unsqueeze(0) == torch.argmax(models(latents), dim=2)).sum(1).unsqueeze(1)
 
+                    # stride on self, stack on dim 0 for self, other
+                    correct_cycle += torch.stack([(labels == torch.argmax(models(embed), dim=2)).sum(1) for embed in cycle_latents], dim=0)
+                else:
+                    outputs = [model(latent).float() for model, latent in zip(models, latents)]
+                    correct_default += torch.stack([(labels == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
+
+                    # stride on out_model, stack on dim 1 for in_model, out_model
+                    correct_adapted += torch.stack([(labels == torch.argmax(model(latents), dim=2)).sum(1) for model in models], dim=1)
+
+                    # stride on self, stack on dim 0 for self, other
+                    correct_cycle += torch.stack([(labels == torch.argmax(model(latent), dim=2)).sum(1) for model, latent in zip(models, cycle_latents)], dim=0)
+                
+            else:
                 # N * [N, B, d_in]
                 # in_model, cycle_model, batch_idx, dim 
-                self_cycle_embeds = adapter.fw_self_cycle_embeds(adapted_embeds)
+                self_cycle_embeds = adapter.fw_cycle_latents_to_self_cycle_embeds(cycle_latents)
 
                 correct_default += torch.stack([(labels == torch.argmax(fw_head(model.float(), embed.float()), dim=1)).sum() for model, embed in zip(models, embeds)], dim=0)
 
@@ -211,34 +244,14 @@ def count_correct(models, adapter, labels_val, shared=False, embeds=None, latent
 
                 # stride on self, stack on dim 0 for self, other
                 correct_cycle += torch.stack([(labels.unsqueeze(0) == torch.argmax(fw_head(model.float(), embed.float()), dim=-1)).sum(-1) for model, embed in zip(models, self_cycle_embeds)], dim=0)
-            else:
-                # [N, B, d_hidden]
-                embeds = torch.stack(embeds, dim=0)
-                adapted_embeds = adapter.fw_latent_to_all_embeds(embeds)
-                cycle_latents = adapter.fw_cycle_latents(adapted_embeds)
-                if shared:
-                    outputs = models(torch.stack(embeds, dim=0))
-                    # stride on out_model, stack on dim 1 for in_model, out_model
-                    correct_adapted += (labels == torch.argmax(models(embeds), dim=2)).sum(1).unsqueeze(1)
 
-                    # stride on self, stack on dim 0 for self, other
-                    correct_cycle += torch.stack([(labels == torch.argmax(model(embed), dim=2)).sum(1) for embed in cycle_latents], dim=0)
-                else:
-                    outputs = [model(embed).float() for model, embed in zip(models, embeds)]
-                    correct_default += torch.stack([(labels == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
-
-                    # stride on out_model, stack on dim 1 for in_model, out_model
-                    correct_adapted += torch.stack([(labels == torch.argmax(model(embeds), dim=2)).sum(1) for model in models], dim=1)
-
-                    # stride on self, stack on dim 0 for self, other
-                    correct_cycle += torch.stack([(labels == torch.argmax(probe(latent), dim=2)).sum(1) for probe, latent in zip(probes_for_latents, cycle_latents)], dim=0)
                 
             total += len(labels)
     print(f'default: {correct_default/total}, adapted: {correct_adapted/total}, cycle: {correct_cycle/total}')
     return correct_default, correct_adapted, correct_cycle, total
 
 def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(models, adapter, labels_val, embeds = embeds_val)
+    correct_default, correct_adapted, correct_cycle, total = count_correct(models, adapter, embeds_val, labels_val)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -260,7 +273,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Top-1 Accuracy adapting to stock heads", 
         "Top-1 Accuracy", 
-        out_file = "outputs/cls_adapter_with_stock_head.png"
+        out_file = out_dir + "cls_adapter_with_stock_head.png"
     )
 
     plot_heatmap(
@@ -268,7 +281,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Change in Top-1 Accuracy of Backbone vs. Adapting to Self", 
         "Change in Top-1 Accuracy", 
-        out_file = "outputs/cls_adapter_with_stock_head_vs_backbone_adapted_to_self.png"
+        out_file = out_dir + "ls_adapter_with_stock_head_vs_backbone_adapted_to_self.png"
     )
 
     plot_heatmap(
@@ -276,7 +289,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Change in Top-1 Accuracy of Head vs. Adapting to Self", 
         "Change in Top-1 Accuracy", 
-        out_file = "outputs/cls_adapter_with_stock_head_vs_head_adapted_to_self.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_vs_head_adapted_to_self.png"
     )
 
     plot_heatmap(
@@ -284,7 +297,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Change in Top-1 Accuracy of Backbone vs. No Adapter", 
         "Change in Top-1 Accuracy", 
-        out_file = "outputs/cls_adapter_with_stock_head_vs_backbone_without_adapter.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_vs_backbone_without_adapter.png"
     )
 
     plot_heatmap(
@@ -292,7 +305,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Change in Top-1 Accuracy of Head vs. No Adapter", 
         "Change in Top-1 Accuracy", 
-        out_file = "outputs/cls_adapter_with_stock_head_vs_head_without_adapter.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_vs_head_without_adapter.png"
     )
 
     plot_heatmap(
@@ -301,7 +314,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         "Cycle Top-1 Accuracy", 
         "Top-1 Accuracy",
         x_label = "Cycle model",
-        out_file = "outputs/cls_adapter_with_stock_head_cycle.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_cycle.png"
     )
 
     plot_heatmap(
@@ -310,7 +323,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         "Change in Cycle Top-1 Accuracy vs Adapting to Self", 
         "Change in Top-1 Accuracy",
         x_label = "Cycle model",
-        out_file = "outputs/cls_adapter_with_stock_head_cycle_vs_adapting_to_self.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_cycle_vs_adapting_to_self.png"
     )
 
     plot_heatmap(
@@ -319,7 +332,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         "Change in Cycle Top-1 Accuracy vs Self Cycle", 
         "Change in Top-1 Accuracy",
         x_label = "Cycle model",
-        out_file = "outputs/cls_adapter_with_stock_head_cycle_vs_self_cycle.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_cycle_vs_self_cycle.png"
     )
 
     plot_heatmap(
@@ -328,14 +341,13 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         "Change in Cycle Top-1 Accuracy vs No Adapter", 
         "Change in Top-1 Accuracy",
         x_label = "Cycle model",
-        out_file = "outputs/cls_adapter_with_stock_head_cycle_vs_no_adapt.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_cycle_vs_no_adapt.png"
     )
 
     return correct_default, correct_adapted, correct_cycle, total
 
-
 def eval_cls_with_embedding_probes(probes, adapter, embeds_val, labels_val):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, labels_val, embeds = embeds_val)
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, embeds_val, labels_val)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -352,13 +364,13 @@ def eval_cls_with_embedding_probes(probes, adapter, embeds_val, labels_val):
         "Top-1 Accuracy adapting to embedding probes", 
         "Top-1 Accuracy",
         x_label = "Backbone of embedding probe",
-        out_file = "outputs/cls_adapter_with_embedding_probes.png"
+        out_file = out_dir + "cls_adapter_with_embedding_probes.png"
     )
 
     return correct_default, correct_adapted, correct_cycle, total
 
-def eval_cls_with_latent_probes(probes, adapter, latents_val, labels_val):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, labels_val, latents = latents_val)
+def eval_cls_with_latent_probes(probes, adapter, embeds_val, labels_val):
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probes, adapter, embeds_val, labels_val, use_latents=True)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -371,13 +383,13 @@ def eval_cls_with_latent_probes(probes, adapter, latents_val, labels_val):
         "Top-1 Accuracy Adapting to Latent Linear Probes", 
         "Top-1 Accuracy",
         x_label = "Backbone of latent probe",
-        out_file = "outputs/cls_adapter_with_latent_probes.png"
+        out_file = out_dir + "cls_adapter_with_latent_probes.png"
     )
 
     return correct_default, correct_adapted, correct_cycle, total
 
-def eval_cls_with_shared_latent_probe(probe, adapter, latents_val, labels_val, top1_adapted_probes):
-    correct_default, correct_adapted, correct_cycle, total = count_correct(probe, adapter, labels_val, latents = latents_val, shared=True)
+def eval_cls_with_shared_latent_probe(probe, adapter, embeds_val, labels_val, top1_adapted_probes):
+    correct_default, correct_adapted, correct_cycle, total = count_correct(probe, adapter, embeds_val, labels_val, use_latents=True, shared=True)
 
     top1_adapted = correct_adapted/total
     top1_default = correct_default/total
@@ -389,16 +401,16 @@ def eval_cls_with_shared_latent_probe(probe, adapter, latents_val, labels_val, t
         "Top-1 Accuracy of Shared Latent Linear Probe", 
         "Top-1 Accuracy",
         y_label = None,
-        out_file = "outputs/cls_adapter_with_shared_latent_probe.png"
+        out_file = out_dir + "cls_adapter_with_shared_latent_probe.png"
     )
 
     plot_heatmap(
         (top1_adapted[:,0].unsqueeze(1) - top1_adapted_probes).cpu().numpy(),
         model_names,
-        "Top-1 Accuracy Change from Non-shared Adapter Probes to Shared Latent Probe",
+        "Top-1 Accuracy Change from Non-shared Latent Probes to Shared Latent Probe",
         "Top-1 Accuracy",
         x_label = "Backbone of latent probe",
-        out_file = "outputs/cls_adapter_with_shared_latent_probe_vs_separate_latent_probes.png"
+        out_file = out_dir + "cls_adapter_with_shared_latent_probe_vs_separate_latent_probes.png"
     )
 
     return correct_default, correct_adapted, correct_cycle, total
@@ -428,8 +440,9 @@ if __name__ == '__main__':
 
     labels_val = torch.load('embeds/labels_in1k_val.pt', map_location='cpu')
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
-    adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
+    #adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
     #adapter.load_state_dict(torch.load('adapters/adapter_20251014_weights_only.pt', weights_only=True))
+    adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True))
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')
     adapter = adapter.to(device)
@@ -438,8 +451,11 @@ if __name__ == '__main__':
     print(model_names)
     print([x[0].shape for x in embeds_train])
 
+    print("\nstock head eval\n")
     eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val)
 
+    print("\ntrain and evaluate embedding probes\n")
+    # TODO impl model selection and hparam sweeps for probes like oai clip/other probe papers
     model_embedding_probes, _ = train_probe_on_embeddings(
         embeds_train, 
         labels_train, 
@@ -453,21 +469,35 @@ if __name__ == '__main__':
 
     eval_cls_with_embedding_probes(model_embedding_probes, adapter, embeds_val, labels_val)
 
-    latents_train = compute_latents(embeds_train, adapter)
-    latents_val = compute_latents(embeds_val, adapter)
-
+    print("\ntrain and evaluate non-shared latent probes")
     latent_probes, _ = train_probe_on_embeddings(
-        latents_train, 
+        embeds_train, 
         labels_train, 
-        latents_val, 
+        embeds_val, 
         labels_val, 
+        use_latents=True,
+        adapter=adapter,
         lr=0.003, 
         aug_strength = 0.6, 
         epochs = 20, 
         bs=None
     )
 
-    latent_probe_results = eval_cls_with_latent_probes(latent_probes, adapter, latents_val, labels_val)
+    latent_probe_results = eval_cls_with_latent_probes(latent_probes, adapter, embeds_val, labels_val)
     top1_adapted_probes = latent_probe_results[1]/latent_probe_results[3]
 
-    eval_cls_with_latent_probes(latent_probes, adapter, latents_val, labels_val, top1_adapted_probes)
+    print("\ntrain and evaluate shared latent probe")
+    shared_latent_probe, _ = train_probe_on_embeddings(
+        embeds_train, 
+        labels_train, 
+        embeds_val, 
+        labels_val, 
+        use_latents=True,
+        adapter=adapter,
+        lr=0.003, 
+        aug_strength = 0.6, 
+        epochs = 20, 
+        bs=None,
+        shared=True
+    )
+    eval_cls_with_shared_latent_probe(shared_latent_probe, adapter, embeds_val, labels_val, top1_adapted_probes)
