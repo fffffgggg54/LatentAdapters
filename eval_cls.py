@@ -22,7 +22,7 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_latent1.0_MSE/"
+out_dir = "outputs/basic_discriminator0.3_MSE/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -259,7 +259,7 @@ def eval_cls_with_stock_heads(models, adapter, embeds_val, labels_val):
         model_names, 
         "Change in Top-1 Accuracy of Backbone vs. Adapting to Self", 
         "Change in Top-1 Accuracy", 
-        out_file = out_dir + "ls_adapter_with_stock_head_vs_backbone_adapted_to_self.png"
+        out_file = out_dir + "cls_adapter_with_stock_head_vs_backbone_adapted_to_self.png"
     )
 
     plot_heatmap(

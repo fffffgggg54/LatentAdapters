@@ -25,7 +25,7 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_latent1.0_MSE/"
+out_dir = "outputs/basic_discriminator0.3_MSE/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
