@@ -34,6 +34,21 @@ class MLP(nn.Module):
         h = self.act_fn(self.fc1(x) + fc1_lora(x))
         return self.fc2(h) + fc2_lora(h) #+ x * self.res_scale
 
+
+def filter_state_dict(state_dict, search_key):
+    filtered_dict = {}
+
+    # Iterate over the items in the state dictionary
+    for key, value in state_dict.items():
+        # Check if the key starts with the search key followed by a dot
+        if key.startswith(search_key + '.'):
+            # Extract the suffix after the dot
+            suffix = key.split('.')[-1]
+            filtered_dict[suffix] = value
+    return filtered_dict
+
+# TODO dict inputs instead of list
+
 class Adapter(nn.Module):
     def __init__(
         self, 
@@ -49,15 +64,55 @@ class Adapter(nn.Module):
         self.name_to_dim = {k: v for k, v in zip(model_names, model_dims)}
 
         self.hidden_dim = hidden_dim
-        self.middle_model = middle_model(hidden_dim)
+        self.middle_model = middle_model(self.hidden_dim)
         
-        expansion_factor = self.middle_model.expansion_factor
-        self.encoders = nn.ModuleDict({name: nn.Linear(dim, hidden_dim) for name, dim in zip(model_names, model_dims)})
-        self.fc1_loras = nn.ModuleDict({name: LoRA(hidden_dim, hidden_dim*expansion_factor) for name in model_names})
-        self.fc2_loras = nn.ModuleDict({name: LoRA(hidden_dim*expansion_factor, hidden_dim) for name in model_names})
-        self.decoders = nn.ModuleDict({name: nn.Linear(hidden_dim, dim) for name, dim in zip(model_names, model_dims)})
+        self.expansion_factor = self.middle_model.expansion_factor
+        self.encoders = nn.ModuleDict({name: nn.Linear(dim, self.hidden_dim) for name, dim in zip(model_names, model_dims)})
+        self.fc1_loras = nn.ModuleDict({name: LoRA(self.hidden_dim, self.hidden_dim*self.expansion_factor) for name in model_names})
+        self.fc2_loras = nn.ModuleDict({name: LoRA(self.hidden_dim*self.expansion_factor, self.hidden_dim) for name in model_names})
+        self.decoders = nn.ModuleDict({name: nn.Linear(self.hidden_dim, dim) for name, dim in zip(model_names, model_dims)})
 
         #discriminator = nn.Sequential(nn.Linear(hidden_dim, 1024), nn.GELU(), nn.Linear(1024, len(models)))
+
+    def expand(self, model_names: list, model_dims: list):
+        # FIXME no safety checks, can be descructive
+        self.encoders.update({name: nn.Linear(dim, self.hidden_dim) for name, dim in zip(model_names, model_dims)})
+        self.fc1_loras.update({name: LoRA(self.hidden_dim, self.hidden_dim*self.expansion_factor) for name in model_names})
+        self.fc2_loras.update({name: LoRA(self.hidden_dim*self.expansion_factor, self.hidden_dim) for name in model_names})
+        self.decoders.update({name: nn.Linear(self.hidden_dim, dim) for name, dim in zip(model_names, model_dims)})
+
+        self.name_to_dim.update({k: v for k, v in zip(model_names, model_dims)})
+        self.model_dims.extend(model_dims)
+        self.model_names.extend(model_names)
+    
+    def get_params_for_one_model(self, model_name):
+        return [
+            *self.encoders[model_name].parameters(),
+            *self.fc1_loras[model_name].parameters(),
+            *self.fc2_loras[model_name].parameters(),
+            *self.decoders[model_name].parameters()
+        ]
+    
+    def get_state_dict_for_one_model(self, model_name):
+        return nn.ModuleDict({
+            'encoder': self.encoders[model_name],
+            'fc1_lora': self.fc1_loras[model_name],
+            'fc2_lora': self.fc2_loras[model_name],
+            'decoder': self.decoders[model_name]
+        }).state_dict()
+
+    # FIXME There is probably a better way to save checkpoints, probably thorugh selecting keys of the within the moduledict to store and doing partial loads.
+    def load_state_dict_for_one_model(self, model_name, state_dict):
+        self.encoders[model_name].load_state_dict(filter_state_dict(state_dict, 'encoder')) 
+        self.fc1_loras[model_name].load_state_dict(filter_state_dict(state_dict, 'fc1_lora')) 
+        self.fc2_loras[model_name].load_state_dict(filter_state_dict(state_dict, 'fc2_lora')) 
+        self.decoders[model_name].load_state_dict(filter_state_dict(state_dict, 'decoder')) 
+
+    def get_params_for_model_list(self, model_names):
+        params = []
+        for model in model_names:
+            params.extend(self.get_params_for_one_model(model))
+        return params
 
     def fw_one_embed_to_latent(self, embed, model_name):
         # input shape of [B, d_in]

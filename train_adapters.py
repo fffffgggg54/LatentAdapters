@@ -25,7 +25,8 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_MSE/"
+out_dir = "outputs/basic_discriminator0.3_MSE_expansion_AllAnchors_SeparateAddition/"
+expand = True
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -36,7 +37,7 @@ def create_dir(dir):
         print("Created Directory : ", dir)
     return dir
 
-model_names = [
+base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',
     'vit_base_patch16_224.augreg_in21k_ft_in1k',
@@ -49,6 +50,21 @@ model_names = [
     #'vit_base_patch16_siglip_224.v2_webli',
     'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
 ]
+
+if expand:
+    models_to_add = [
+        'convnext_base.fb_in1k',
+        'beit3_large_patch16_224.in22k_ft_in1k',
+        'convnextv2_base.fcmae_ft_in1k',
+        'aimv2_large_patch14_224.apple_pt',
+        'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
+    ]
+    model_names = [*base_adapter_models, *models_to_add]
+else:
+    model_names = base_adapter_models
+
+
+
 # TODO unnecesary, figure out a way to get embed dim/head without instantiating and loading weights for the whole model
 print("building models...")
 models = [timm.create_model(model_name, pretrained=True, num_classes=1000).eval() for model_name in tqdm.tqdm(model_names)]
@@ -92,27 +108,40 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
-adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims).to(device)
+if expand:
+    adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)])
+    adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True, map_location='cpu'))
+    adapter.expand([x.replace('.', '_') for x in models_to_add], model_dims[len(base_adapter_models):])
+else:
+    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
+
+
+adapter = adapter.to(device)
 print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
 discriminator = nn.Sequential(
         nn.Linear(adapter.hidden_dim, 1024),
         nn.GELU(),
-        nn.Linear(1024, len(models))
+        nn.Linear(1024, len(model_names))
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 100
-lr = 3e-5
-bs_train = 2**11
+num_epochs = 20
+lr = 3e-4
+bs_train = 2**10
 bs_val = 1000
 
 embeds_ds = EmbeddingDataset(embeds_train)
 loader = timm.data.loader.MultiEpochsDataLoader(embeds_ds, batch_size=bs_train, num_workers=16, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=3)
 #loader = list(zip(*[torch.split(x, bs_train, 0) for x in embeds_train]))
 
-optimizer = timm.optim.Adan(adapter.parameters(), lr=lr, weight_decay=2e-2)
+if expand:
+    params_to_optimize = adapter.get_params_for_model_list([x.replace('.', '_') for x in models_to_add])
+else:
+    params_to_optimize = adapter.parameters()
+
+optimizer = timm.optim.Adan(params_to_optimize, lr=lr, weight_decay=2e-2)
 scaler = torch.amp.GradScaler('cuda')
 scheduler = optim.lr_scheduler.OneCycleLR(
     optimizer,
@@ -142,6 +171,7 @@ for i in range(num_epochs):
     loss_train = 0
     loss_dc_train = 0
     dc_correct_train = 0
+    adapter.train()
     for embeds in tqdm.tqdm(loader):
         embeds = [embed.to(device, non_blocking=True) for embed in embeds]
         optimizer.zero_grad()
@@ -173,6 +203,7 @@ for i in range(num_epochs):
     loss_val = 0
     loss_dc_val = 0
     dc_correct_val = 0
+    adapter.eval()
     for embeds in zip(*[torch.split(x, bs_val, 0) for x in embeds_val]):
         with torch.no_grad():
             loss, loss_dc, loss_dc_pred, dc_acc = losses.pairwise_adapter_loss_with_discriminator(
@@ -196,6 +227,15 @@ for i in range(num_epochs):
 
     # TODO proper output directory handling
     create_dir(out_dir)
-    torch.save(adapter.state_dict(), out_dir + f'adapter_epoch_{i}.pt')
-    if(i > 0):
-        os.remove(out_dir + f'adapter_epoch_{i-1}.pt')
+    if expand:
+        torch.save(adapter.middle_model.state_dict(), out_dir + f'adapter_middle_model_epoch_{i}.pt')
+        if(i > 0):
+            os.remove(out_dir + f'adapter_middle_model_epoch_{i-1}.pt')
+        for model in model_names:
+            torch.save(adapter.get_state_dict_for_one_model(model.replace('.', '_')), out_dir + f'adapter_{model}_epoch_{i}.pt')
+            if(i > 0):
+                os.remove(out_dir + f'adapter_{model}_epoch_{i-1}.pt')
+    else:
+        torch.save(adapter.state_dict(), out_dir + f'adapter_epoch_{i}.pt')
+        if(i > 0):
+            os.remove(out_dir + f'adapter_epoch_{i-1}.pt')

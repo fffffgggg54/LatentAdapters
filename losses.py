@@ -14,18 +14,21 @@ def norm_MSE_variance(pred, targ, weight = 1):
     return ((weight * (pred - targ) ** 2).mean(dim=reduce_dims) / targ.var(dim=reduce_dims)).mean()
 
 # TODO embeds should be a dict to adapt a subset of adapters by key
-def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=0, dc_ce=1, loss_fn = MSE):
+def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=0, dc_ce=1, loss_fn = MSE):
     # input shape of N * [B, d_in]
     # in_model, batch_idx, dim
 
     # [N, B, d_hidden]
     # in_model, batch_idx, dim
     latents = adapter.fw_all_embeds_to_latent(embeds)
+    with torch.no_grad():
+        latent_noise = torch.randn_like(latents) * latent_aug_str * latents.std(dim=(0,1))
+    latents_noised = latents + latent_noise.detach()
     #print(latents.shape)
 
     # N * [N, B, d_out]
     # out_model, in_model, batch_idx, dim
-    adapted_embeds = adapter.fw_latent_to_all_embeds(latents)
+    adapted_embeds = adapter.fw_latent_to_all_embeds(latents_noised)
 
     # N * [N, B, d_in]
     # in_model, cycle_model, batch_idx, dim   
@@ -68,11 +71,12 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, sel
         discriminator_outputs_infer = discriminator(latent)
         loss_dc_pred = loss_dc_pred + F.cross_entropy(
                 discriminator_outputs_infer, 
-                (1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability
+                #(1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending rerun vs all zeros
+                torch.zeros_like(discriminator_outputs_infer),
             ) / len(latents)
 
     loss_dc_train = 0
-    for i, latent in enumerate(latents.detach()):
+    for i, latent in enumerate(latents_noised.detach()):
         # [B, N]
         discriminator_outputs_train = discriminator(latent)
         loss_dc_train = loss_dc_train + F.cross_entropy(

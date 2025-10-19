@@ -22,13 +22,13 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_MSE/"
+out_dir = "outputs/basic_discriminator0.3_MSE_expansion_AllAnchors_SeparateAddition/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 def plot_heatmap(data, labels, title, cbar_label, x_label = "Original backbone of classifier head", y_label = "Backbone model", out_file = "plot.png"):
-    plt.figure(figsize=(16, 10))
+    plt.figure(figsize=(16, 14))
     heatmap = sns.heatmap(data,
                         xticklabels=labels,
                         yticklabels=labels if len(data) == len(labels) else False,
@@ -52,7 +52,8 @@ def create_dir(dir):
         print("Created Directory : ", dir)
     return dir
 
-model_names = [
+# FIXME inconsistent checkpoints?
+base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',
     'vit_base_patch16_224.augreg_in21k_ft_in1k',
@@ -65,6 +66,17 @@ model_names = [
     #'vit_base_patch16_siglip_224.v2_webli',
     'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
 ]
+
+
+models_to_add = [
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+    'convnextv2_base.fcmae_ft_in1k',
+    'aimv2_large_patch14_224.apple_pt',
+    'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
+]
+model_names = [*base_adapter_models, *models_to_add]
+
 
 @torch.compile()
 def fw_enc(model, x):
@@ -163,7 +175,7 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
     return probes, correct_val/total_val
 
 def count_correct(models, adapter, embeds_val, labels_val, shared=False, use_latents=False):
-    # FIXME old and wrong!!
+    # FIXME old and wrong inputs description!!
     # case stock heads: models is list of models, shared=False, embeds=list of embeds, latents=None
     # case embedding probes: models is modulelist of probes, shared=False, embeds=list of embeds, latents=None
     # case latent probes: models is modulelist of probes, shared=False, embeds=None, latents=list of latents
@@ -420,7 +432,15 @@ if __name__ == '__main__':
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
     #adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
     #adapter.load_state_dict(torch.load('adapters/adapter_20251014_weights_only.pt', weights_only=True))
-    adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True))
+    #adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True))
+    #adapter.expand([x.replace('.', '_') for x in models_to_add], model_dims[len(base_adapter_models):])
+    for model in model_names:
+        adapter.load_state_dict_for_one_model(
+            model.replace('.', '_'), 
+            torch.load(out_dir + f"adapter_{model}_epoch_19.pt", weights_only=True, map_location='cpu')
+        )
+    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_19.pt", weights_only=True, map_location='cpu'))
+    adapter = adapter.to(device)
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')
     adapter = adapter.to(device)
