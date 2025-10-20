@@ -25,7 +25,8 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
+#out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
+out_dir = "outputs/dc_targ_1_discriminator1.0_latent1.0_MSE/"
 expand = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -43,11 +44,7 @@ base_adapter_models = [
     'vit_base_patch16_224.augreg_in21k_ft_in1k',
     'vit_base_patch16_clip_224.openai_ft_in1k',
     'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
-    #'vit_small_patch16_224.dino',
-    #'eva02_base_patch14_448.mim_in22k_ft_in22k',
     'vit_large_patch16_dinov3.lvd1689m',
-    #'vit_base_patch16_224.mae',
-    #'vit_base_patch16_siglip_224.v2_webli',
     'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
 ]
 
@@ -117,7 +114,6 @@ else:
 
 
 adapter = adapter.to(device)
-adapter = torch.compile(adapter)
 print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
@@ -128,9 +124,9 @@ discriminator = nn.Sequential(
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 50
-lr = 3e-4
-dc_lr = 1e-4
+num_epochs = 40
+lr = 1e-4
+dc_lr = 3e-5
 bs_train = 2**10
 bs_val = 1000
 

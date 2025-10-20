@@ -22,7 +22,10 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
     # in_model, batch_idx, dim
     latents = adapter.fw_all_embeds_to_latent(embeds)
     with torch.no_grad():
-        latent_noise = torch.randn_like(latents) * latent_aug_str * latents.std(dim=(0,1))
+        if adapter.training:
+            latent_noise = torch.randn_like(latents) * latent_aug_str * latents.std(dim=(0,1))
+        else:
+            latent_noise = torch.zeros_like(latents)
     latents_noised = latents + latent_noise.detach()
     #print(latents.shape)
 
@@ -71,8 +74,9 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         discriminator_outputs_infer = discriminator(latent)
         loss_dc_pred = loss_dc_pred + F.cross_entropy(
                 discriminator_outputs_infer, 
-                #(1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending rerun vs all zeros
-                torch.zeros_like(discriminator_outputs_infer),
+                #(1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending test for which is best
+                #torch.zeros_like(discriminator_outputs_infer),  # target: all classes have target of 0
+                torch.ones_like(discriminator_outputs_infer), # target: all classes have target of 1
             ) / len(latents)
 
     loss_dc_train = 0
