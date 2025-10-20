@@ -14,7 +14,7 @@ def norm_MSE_variance(pred, targ, weight = 1):
     return ((weight * (pred - targ) ** 2).mean(dim=reduce_dims) / targ.var(dim=reduce_dims)).mean()
 
 # TODO embeds should be a dict to adapt a subset of adapters by key
-def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=0, dc_ce=1, loss_fn = MSE):
+def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=1, dc_ce=1, loss_fn = MSE):
     # input shape of N * [B, d_in]
     # in_model, batch_idx, dim
 
@@ -76,7 +76,7 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
             ) / len(latents)
 
     loss_dc_train = 0
-    for i, latent in enumerate(latents_noised.detach()):
+    for i, latent in enumerate(latents.detach()):
         # [B, N]
         discriminator_outputs_train = discriminator(latent)
         loss_dc_train = loss_dc_train + F.cross_entropy(

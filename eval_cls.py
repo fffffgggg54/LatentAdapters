@@ -419,7 +419,7 @@ if __name__ == '__main__':
             map_location='cpu'
         ).to(torch.bfloat16) for model in tqdm.tqdm(models)
     ]
-    labels_train = torch.load('embeds/labels_in1k_train.pt', map_location='cpu')
+    labels_train = torch.load('labels_in1k_train.pt', map_location='cpu')
 
     embeds_val = [
         torch.load(
@@ -428,7 +428,7 @@ if __name__ == '__main__':
         ) for model in models
     ]
 
-    labels_val = torch.load('embeds/labels_in1k_val.pt', map_location='cpu')
+    labels_val = torch.load('labels_in1k_val.pt', map_location='cpu')
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
     #adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
     #adapter.load_state_dict(torch.load('adapters/adapter_20251014_weights_only.pt', weights_only=True))

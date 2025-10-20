@@ -25,8 +25,8 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_MSE_expansion_AllAnchors_SeparateAddition/"
-expand = True
+out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
+expand = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -117,18 +117,20 @@ else:
 
 
 adapter = adapter.to(device)
+adapter = torch.compile(adapter)
 print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
 discriminator = nn.Sequential(
-        nn.Linear(adapter.hidden_dim, 1024),
+        nn.Linear(adapter.hidden_dim, 128),
         nn.GELU(),
-        nn.Linear(1024, len(model_names))
+        nn.Linear(128, len(model_names))
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 20
+num_epochs = 50
 lr = 3e-4
+dc_lr = 1e-4
 bs_train = 2**10
 bs_val = 1000
 
@@ -152,11 +154,11 @@ scheduler = optim.lr_scheduler.OneCycleLR(
     pct_start=0.1
 )
 
-opt_dc = timm.optim.Adan(discriminator.parameters(), lr=lr, weight_decay=1e-5)
+opt_dc = timm.optim.Adan(discriminator.parameters(), lr=lr, weight_decay=2e-2)
 scaler_dc = torch.amp.GradScaler('cuda')
 scheduler_dc = optim.lr_scheduler.OneCycleLR(
     opt_dc,
-    max_lr=lr,
+    max_lr=dc_lr,
     #steps_per_epoch=math.ceil(len(embeds_train[0]) / bs_train) * num_epochs,
     steps_per_epoch=len(loader),
     epochs=num_epochs,
@@ -181,7 +183,6 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [(embed + (torch.randn_like(embed) * aug_strength * embed.std(dim=0)).detach()).float() for embed in embeds],
-                dc_ce=0.3
             )
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -210,7 +211,6 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [embed.float() for embed in embeds],
-                dc_ce = 0.3
             )
             loss_val = loss_val + loss * bs_val
             loss_dc_val = loss_dc_val + loss_dc * bs_val
@@ -227,15 +227,11 @@ for i in range(num_epochs):
 
     # TODO proper output directory handling
     create_dir(out_dir)
-    if expand:
-        torch.save(adapter.middle_model.state_dict(), out_dir + f'adapter_middle_model_epoch_{i}.pt')
+    
+    torch.save(adapter.middle_model.state_dict(), out_dir + f'adapter_middle_model_epoch_{i}.pt')
+    if(i > 0):
+        os.remove(out_dir + f'adapter_middle_model_epoch_{i-1}.pt')
+    for model in model_names:
+        torch.save(adapter.get_state_dict_for_one_model(model.replace('.', '_')), out_dir + f'adapter_{model}_epoch_{i}.pt')
         if(i > 0):
-            os.remove(out_dir + f'adapter_middle_model_epoch_{i-1}.pt')
-        for model in model_names:
-            torch.save(adapter.get_state_dict_for_one_model(model.replace('.', '_')), out_dir + f'adapter_{model}_epoch_{i}.pt')
-            if(i > 0):
-                os.remove(out_dir + f'adapter_{model}_epoch_{i-1}.pt')
-    else:
-        torch.save(adapter.state_dict(), out_dir + f'adapter_epoch_{i}.pt')
-        if(i > 0):
-            os.remove(out_dir + f'adapter_epoch_{i-1}.pt')
+            os.remove(out_dir + f'adapter_{model}_epoch_{i-1}.pt')
