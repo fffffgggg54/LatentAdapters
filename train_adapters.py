@@ -26,7 +26,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/dc_targ_1_discriminator1.0_latent1.0_MSE/"
+out_dir = "outputs/basic_mmID_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 expand = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -46,6 +46,12 @@ base_adapter_models = [
     'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
     'vit_large_patch16_dinov3.lvd1689m',
     'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+    'convnextv2_base.fcmae_ft_in1k',
+    'aimv2_large_patch14_224.apple_pt',
+    'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
 ]
 
 if expand:
@@ -107,7 +113,13 @@ class EmbeddingDataset(torch.utils.data.Dataset):
 
 if expand:
     adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)])
-    adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True, map_location='cpu'))
+    #adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True, map_location='cpu'))
+    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_39.pt", weights_only=True, map_location='cpu'))
+    for model in base_adapter_models:
+        adapter.load_state_dict_for_one_model(
+            model.replace('.', '_'), 
+            torch.load(out_dir + f"adapter_{model}_epoch_39.pt", weights_only=True, map_location='cpu')
+        )
     adapter.expand([x.replace('.', '_') for x in models_to_add], model_dims[len(base_adapter_models):])
 else:
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)

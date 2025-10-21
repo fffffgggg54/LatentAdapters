@@ -34,6 +34,19 @@ class MLP(nn.Module):
         h = self.act_fn(self.fc1(x) + fc1_lora(x))
         return self.fc2(h) + fc2_lora(h) #+ x * self.res_scale
 
+class mmID(nn.Module):
+    def __init__(self, dim, expansion_factor=4, act_fn=nn.GELU):
+        super().__init__()
+        #self.fc1 = nn.Linear(dim, dim * expansion_factor)
+        #self.fc2 = nn.Linear(dim * expansion_factor, dim)
+        self.expansion_factor = expansion_factor
+        #self.res_scale = nn.Parameter(torch.ones(dim))
+        self.act_fn = act_fn()
+    
+    def forward(self, x, fc1_lora = zero, fc2_lora = zero):
+        #h = self.act_fn(self.fc1(x) + fc1_lora(x))
+        #return self.fc2(h) + fc2_lora(h) #+ x * self.res_scale
+        return x
 
 def filter_state_dict(state_dict, search_key):
     filtered_dict = {}
@@ -55,7 +68,7 @@ class Adapter(nn.Module):
         model_names: list, 
         model_dims: list, 
         hidden_dim = 2048, 
-        middle_model = MLP
+        middle_model = mmID
     ):
         super().__init__()
         self.model_names = model_names

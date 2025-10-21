@@ -22,7 +22,7 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_discriminator0.3_MSE_expansion_AllAnchors_SeparateAddition/"
+out_dir = "outputs/basic_mmID_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -76,6 +76,7 @@ models_to_add = [
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
 ]
 model_names = [*base_adapter_models, *models_to_add]
+#model_names = base_adapter_models
 
 
 @torch.compile()
@@ -437,9 +438,9 @@ if __name__ == '__main__':
     for model in model_names:
         adapter.load_state_dict_for_one_model(
             model.replace('.', '_'), 
-            torch.load(out_dir + f"adapter_{model}_epoch_19.pt", weights_only=True, map_location='cpu')
+            torch.load(out_dir + f"adapter_{model}_epoch_39.pt", weights_only=True, map_location='cpu')
         )
-    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_19.pt", weights_only=True, map_location='cpu'))
+    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_39.pt", weights_only=True, map_location='cpu'))
     adapter = adapter.to(device)
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')

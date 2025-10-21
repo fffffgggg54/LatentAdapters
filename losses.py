@@ -74,9 +74,9 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         discriminator_outputs_infer = discriminator(latent)
         loss_dc_pred = loss_dc_pred + F.cross_entropy(
                 discriminator_outputs_infer, 
-                #(1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending test for which is best
+                (1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending test for which is best
                 #torch.zeros_like(discriminator_outputs_infer),  # target: all classes have target of 0
-                torch.ones_like(discriminator_outputs_infer), # target: all classes have target of 1
+                #torch.ones_like(discriminator_outputs_infer), # target: all classes have target of 1
             ) / len(latents)
 
     loss_dc_train = 0
