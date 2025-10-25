@@ -204,9 +204,9 @@ def train_probe_on_embeddings(
         total_val = 0
         for i, embedBatch in enumerate(loader_train):
             with torch.autocast(device.type, dtype=autocast_dtype):
-                embedBatch = [embed.to(device, non_blocking=True).float() for embed in embedBatch]
+                embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
                 labelBatch = embedBatch[0]
-                embedBatch = embedBatch[1:]
+                embedBatch = [embed.float() for embed in embedBatch[1:]]
                 if use_latents:
                     embedBatch = adapter.fw_all_embeds_to_latent(embedBatch)
                 # noise aug
