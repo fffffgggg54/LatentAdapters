@@ -22,12 +22,54 @@ import os
 from adapter import Adapter
 import losses
 
+import io
+import csv
+
 out_dir = "outputs/basic_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
-def plot_heatmap(data, labels, title, cbar_label, x_label = "Original backbone of classifier head", y_label = "Backbone model", out_file = "plot.png"):
+# Gemini-2.5-pro, format data as image metadata
+def create_csv_string(tensor, names):
+    """
+    Generates a CSV-formatted string from an nxn tensor and a list of n names.
+
+    Args:
+        tensor: An 1xn or nxn list of lists (the tensor).
+        names: A list of n strings (the names).
+
+    Returns:
+        A string in CSV format.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write the header row
+    header = ["Model Name"] + names
+    writer.writerow(header)
+
+    # Write the data rows
+    for i, row in enumerate(tensor):
+        if len(tensor) == len(names):
+            row = [names[i]] + row.tolist()
+        elif len(tensor) == 1:
+            row = [""] + row.tolist()
+        else: break
+        writer.writerow(row)
+
+    return output.getvalue()
+
+
+def plot_heatmap(
+    data, 
+    labels, 
+    title, 
+    cbar_label, 
+    x_label = "Original backbone of classifier head", 
+    y_label = "Backbone model", 
+    out_file = "plot.png"
+):
     plt.figure(figsize=(16, 14))
     heatmap = sns.heatmap(data,
                         xticklabels=labels,
@@ -44,7 +86,9 @@ def plot_heatmap(data, labels, title, cbar_label, x_label = "Original backbone o
     plt.ylabel(y_label, fontsize=16, labelpad=15)
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.savefig(out_file)
+    data_csv = create_csv_string(data, labels)
+    plt.savefig(out_file, metadata = data_csv)
+    print(data_csv)
 
 def create_dir(dir):
     if not os.path.exists(dir):
