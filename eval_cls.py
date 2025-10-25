@@ -118,7 +118,7 @@ def train_probe_on_embeddings(
     aug_strength = 0.6, 
     epochs = 100, 
     bs=None, 
-    grad_accum_iters=1
+    grad_accum_iters=1,
     shared=False
 ):
     emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
