@@ -206,7 +206,7 @@ def train_probe_on_embeddings(
             with torch.autocast(device.type, dtype=autocast_dtype):
                 embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
                 labelBatch = embedBatch[0]
-                embedBatch = embedBatch[1:]
+                embedBatch = embedBatch[1:].float()
                 if use_latents:
                     embedBatch = adapter.fw_all_embeds_to_latent(embedBatch)
                 # noise aug
@@ -273,6 +273,7 @@ def count_correct(models, adapter, embeds_val, labels_val, shared=False, use_lat
     labels_val = labels_val.to(device)
 
     for embeds, labels in zip(zip(*[torch.split(x, bs_val, 0) for x in embeds_val]), torch.split(labels_val, bs_val, 0)):
+        embeds = embeds.float()
         with torch.no_grad():
             latents = adapter.fw_all_embeds_to_latent(embeds)
             adapted_embeds = adapter.fw_latent_to_all_embeds(latents)
@@ -513,7 +514,7 @@ if __name__ == '__main__':
             torch.load(out_dir + f"adapter_{model}_epoch_39.pt", weights_only=True, map_location='cpu')
         )
     adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_39.pt", weights_only=True, map_location='cpu'))
-    adapter = adapter.to(device)
+    adapter = adapter.to(device).float()
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')
     adapter = adapter.to(device)
