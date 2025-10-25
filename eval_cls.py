@@ -268,12 +268,11 @@ def count_correct(models, adapter, embeds_val, labels_val, shared=False, use_lat
     total = 0
 
     # N * [B, d_model]
-    embeds_val = [embed.to(device) for embed in embeds_val]
+    embeds_val = [embed.to(device).float() for embed in embeds_val]
     # [B]
     labels_val = labels_val.to(device)
 
     for embeds, labels in zip(zip(*[torch.split(x, bs_val, 0) for x in embeds_val]), torch.split(labels_val, bs_val, 0)):
-        embeds = embeds.float()
         with torch.no_grad():
             latents = adapter.fw_all_embeds_to_latent(embeds)
             adapted_embeds = adapter.fw_latent_to_all_embeds(latents)
