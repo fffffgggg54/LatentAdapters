@@ -134,6 +134,12 @@ model_names = [
     'aimv2_large_patch14_224.apple_pt',
     
     'vit_pe_core_gigantic_patch14_448.fb',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 
 @torch.compile()

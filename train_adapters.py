@@ -26,9 +26,9 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-expand = False
-separate_expand = False
+out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE/"
+expand = True
+separate_expand = True
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -72,11 +72,18 @@ base_adapter_models = [
 
 if expand:
     models_to_add = [
+
+        #'convnext_base.fb_in1k',
+        #'beit3_large_patch16_224.in22k_ft_in1k',
+        #'convnextv2_base.fcmae_ft_in1k',
+        #'aimv2_large_patch14_224.apple_pt',
+        #'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
+
+        'convformer_b36.sail_in22k_ft_in1k',
+        'vit_base_patch16_224.augreg_in21k_ft_in1k',
+        'vit_base_patch16_clip_224.openai_ft_in1k',
         'convnext_base.fb_in1k',
         'beit3_large_patch16_224.in22k_ft_in1k',
-        'convnextv2_base.fcmae_ft_in1k',
-        'aimv2_large_patch14_224.apple_pt',
-        'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
     ]
     model_names = [*base_adapter_models, *models_to_add]
     if separate_expand:
