@@ -48,7 +48,7 @@ def create_csv_string(tensor, names):
     # Write the header row
     header = ["Model Name"] + names
     writer.writerow(header)
-
+    torch.set_printoptions(sci_mode=False)
     # Write the data rows
     for i, row in enumerate(tensor):
         if len(tensor) == len(names):
