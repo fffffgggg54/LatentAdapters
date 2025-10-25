@@ -22,7 +22,7 @@ import os
 from adapter import Adapter
 import losses
 
-out_dir = "outputs/basic_mmID_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+out_dir = "outputs/basic_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -107,10 +107,24 @@ class EmbeddingDataset(torch.utils.data.Dataset):
         return tuple([embed[idx] for embed in self.embedsList])
 
 
-def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val, use_latents=False, adapter=None, lr=0.003, aug_strength = 0.6, epochs = 100, bs=None, shared=False):
+def train_probe_on_embeddings(
+    embeds_train, 
+    labels_train, 
+    embeds_val, 
+    labels_val, 
+    use_latents=False, 
+    adapter=None, 
+    lr=0.003, 
+    aug_strength = 0.6, 
+    epochs = 100, 
+    bs=None, 
+    grad_accum_iters=1
+    shared=False
+):
     emb_ds_train = EmbeddingDataset([labels_train, *embeds_train])
     emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
     bs_train = bs or 2**14
+    bs_train = bs_train // grad_accum_iters
     loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=10, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=1)
     loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=10, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=1)
     # FIXME hardcoded class count
@@ -131,7 +145,7 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
         total_train = 0
         correct_val = 0
         total_val = 0
-        for embedBatch in loader_train:
+        for i, embedBatch in enumerate(loader_train):
             with torch.autocast(device.type, dtype=autocast_dtype):
                 embedBatch = [embed.to(device, non_blocking=True) for embed in embedBatch]
                 labelBatch = embedBatch[0]
@@ -149,10 +163,11 @@ def train_probe_on_embeddings(embeds_train, labels_train, embeds_val, labels_val
                 loss = torch.stack([criterion(output, labelBatch) for output in outputs])
                 loss = loss.mean()
                 scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
-                scaler.step(optimizer)
-                scaler.update()
-                scheduler.step()
+                if((i+1) % grad_accum_iters == 0):
+                    scaler.unscale_(optimizer)
+                    scaler.step(optimizer)
+                    scaler.update()
+                    scheduler.step()
                 correct_train = correct_train + torch.stack([(labelBatch == torch.argmax(output, dim=1)).sum() for output in outputs], dim=0)
                 total_train += len(labelBatch)
         for embedBatch in loader_val:
@@ -182,7 +197,7 @@ def count_correct(models, adapter, embeds_val, labels_val, shared=False, use_lat
     # case latent probes: models is modulelist of probes, shared=False, embeds=None, latents=list of latents
     # case shared latent probe: models is latent probe, shared=True, embeds=None, latents=list of latents
 
-    bs_val = 2000
+    bs_val = 100
     # no translation, own head
     correct_default = torch.zeros(len(adapter.model_names), device=device)
     # translate to own/other embedding space
@@ -468,7 +483,8 @@ if __name__ == '__main__':
         lr=0.003, 
         aug_strength = 0.6, 
         epochs = 20, 
-        bs=None
+        bs=2**14, 
+        grad_accum_iters = 2,
     )
     eval_cls_with_embedding_probes(model_embedding_probes, adapter, embeds_val, labels_val)
 
@@ -484,7 +500,8 @@ if __name__ == '__main__':
         lr=0.003, 
         aug_strength = 0.6, 
         epochs = 20, 
-        bs=None
+        bs=2**14, 
+        grad_accum_iters = 2,
     )
     latent_probe_results = eval_cls_with_latent_probes(latent_probes, adapter, embeds_val, labels_val)
     # FIXME there has to be a better way to do this. Can we run all evals, then plot later with all outputs?
@@ -502,7 +519,8 @@ if __name__ == '__main__':
         lr=0.003, 
         aug_strength = 0.6, 
         epochs = 20, 
-        bs=None,
+        bs=2**14, 
+        grad_accum_iters = 2,
         shared=True
     )
     eval_cls_with_shared_latent_probe(shared_latent_probe, adapter, embeds_val, labels_val, top1_adapted_probes)

@@ -26,8 +26,9 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/basic_mmID_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+out_dir = "outputs/basic_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 expand = False
+separate_expand = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -63,6 +64,8 @@ if expand:
         'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
     ]
     model_names = [*base_adapter_models, *models_to_add]
+    if separate_expand:
+        zsl_idxs = (torch.arange(len(models_to_add)) + len(base_adapter_models)).tolist()
 else:
     model_names = base_adapter_models
 
@@ -140,7 +143,8 @@ num_epochs = 40
 lr = 1e-4
 dc_lr = 3e-5
 bs_train = 2**10
-bs_val = 1000
+grad_accum_iters = 1
+bs_val = 250
 
 embeds_ds = EmbeddingDataset(embeds_train)
 loader = timm.data.loader.MultiEpochsDataLoader(embeds_ds, batch_size=bs_train, num_workers=16, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=3)
@@ -177,12 +181,12 @@ embeds_val = [embed.to(device) for embed in embeds_val]
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 aug_strength = 0.8
-for i in range(num_epochs):
+for epoch in range(num_epochs):
     loss_train = 0
     loss_dc_train = 0
     dc_correct_train = 0
     adapter.train()
-    for embeds in tqdm.tqdm(loader):
+    for i, embeds in enumerate(tqdm.tqdm(loader)):
         embeds = [embed.to(device, non_blocking=True) for embed in embeds]
         optimizer.zero_grad()
         opt_dc.zero_grad()
@@ -191,18 +195,20 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [(embed + (torch.randn_like(embed) * aug_strength * embed.std(dim=0)).detach()).float() for embed in embeds],
+                zsl_idxs = zsl_idxs if separate_expand else None
             )
             scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            scaler.step(optimizer)
-            scaler.update()
-            scheduler.step()
-            
             scaler_dc.scale(loss_dc).backward()
-            scaler_dc.unscale_(opt_dc)
-            scaler_dc.step(opt_dc)
-            scaler_dc.update()
-            scheduler_dc.step()
+            if((i+1) % grad_accum_iters == 0):
+                scaler.unscale_(optimizer)
+                scaler.step(optimizer)
+                scaler.update()
+                scheduler.step()
+
+                scaler_dc.unscale_(opt_dc)
+                scaler_dc.step(opt_dc)
+                scaler_dc.update()
+                scheduler_dc.step()
 
             loss_train = loss_train + loss.detach() * bs_train
             loss_dc_train = loss_dc_train + loss_dc.detach() * bs_train
@@ -219,6 +225,7 @@ for i in range(num_epochs):
                 adapter,
                 discriminator,
                 [embed.float() for embed in embeds],
+                zsl_idxs = zsl_idxs if separate_expand else None
             )
             loss_val = loss_val + loss * bs_val
             loss_dc_val = loss_dc_val + loss_dc * bs_val
@@ -229,17 +236,17 @@ for i in range(num_epochs):
     loss_val = loss_val / len(embeds_val[0])
     loss_dc_val = loss_dc_val / len(embeds_val[0])
     dc_acc_val = 100 * dc_correct_val / len(embeds_val[0])
-    print(f'iter {i}: train loss: {loss_train.item()}, train dc loss: {loss_dc_train.item()}, train dc acc: {["{:.4f}".format(x) for x in dc_acc_train]}, ', end="")
+    print(f'epoch {epoch}: train loss: {loss_train.item()}, train dc loss: {loss_dc_train.item()}, train dc acc: {["{:.4f}".format(x) for x in dc_acc_train]}, ', end="")
     print(f'val loss: {loss_val.item()}, val dc loss: {loss_dc_val.item()}, val dc acc: {["{:.4f}".format(x) for x in dc_acc_val]}')
 
 
     # TODO proper output directory handling
     create_dir(out_dir)
     
-    torch.save(adapter.middle_model.state_dict(), out_dir + f'adapter_middle_model_epoch_{i}.pt')
-    if(i > 0):
-        os.remove(out_dir + f'adapter_middle_model_epoch_{i-1}.pt')
+    torch.save(adapter.middle_model.state_dict(), out_dir + f'adapter_middle_model_epoch_{epoch}.pt')
+    if(epoch > 0):
+        os.remove(out_dir + f'adapter_middle_model_epoch_{epoch-1}.pt')
     for model in model_names:
-        torch.save(adapter.get_state_dict_for_one_model(model.replace('.', '_')), out_dir + f'adapter_{model}_epoch_{i}.pt')
-        if(i > 0):
-            os.remove(out_dir + f'adapter_{model}_epoch_{i-1}.pt')
+        torch.save(adapter.get_state_dict_for_one_model(model.replace('.', '_')), out_dir + f'adapter_{model}_epoch_{epoch}.pt')
+        if(epoch > 0):
+            os.remove(out_dir + f'adapter_{model}_epoch_{epoch-1}.pt')

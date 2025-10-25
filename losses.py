@@ -2,7 +2,8 @@ import torch
 import torch.nn.functional as F
 
 def MSE(pred, targ, weight = 1):
-    return (weight * (pred - targ) ** 2).mean()
+    # reduce batch and channel dims, keep anything before
+    return (weight * (pred - targ) ** 2).mean(dim=(-2,-1))#.mean()
 
 # normalize each dimension to compensate for differing dimension scales
 def norm_MSE_signal_power(pred, targ, weight = 1):
@@ -14,7 +15,7 @@ def norm_MSE_variance(pred, targ, weight = 1):
     return ((weight * (pred - targ) ** 2).mean(dim=reduce_dims) / targ.var(dim=reduce_dims)).mean()
 
 # TODO embeds should be a dict to adapt a subset of adapters by key
-def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=1, dc_ce=1, loss_fn = MSE):
+def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=1, dc_ce=1, loss_fn = MSE, zsl_idxs = None):
     # input shape of N * [B, d_in]
     # in_model, batch_idx, dim
 
@@ -45,10 +46,23 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
             embed.unsqueeze(0), # [1, B, d_out]
             weight=(pw_mse * torch.ones(len(embeds), device=embed.device)).scatter_(0, torch.tensor(i, device=embed.device), self_mse).reshape(len(embeds), 1, 1) # [N, 1, 1]
         ) for i, (adapted_embed, embed) in enumerate(zip(adapted_embeds, embeds))
-    ]).mean()
+    ])#.mean()
+    if zsl_idxs is not None and len(zsl_idxs) > 0:
+        mask = torch.ones_like(loss_reconstruction)
+        idxs_tensor = torch.tensor(zsl_idxs, device=loss_reconstruction.device)
+        mask[idxs_tensor[:, None], idxs_tensor] = 0
+        mask[idxs_tensor, idxs_tensor] = 1
+        # mask off pairwise interactions between tensors in zsl_idxs 
+
+        cls_mask = mask
+    else:
+        mask = 1
+        cls_mask = torch.ones(len(embeds), len(embeds), device=latents.device)
+    loss_reconstruction = (loss_reconstruction * mask).mean()
 
 
     # 0 on diagonal, cycle consistency everywhere else
+    # stride by input model
     # TODO try not masking diagonal
     loss_cycle_consistency = torch.stack([
         loss_fn(
@@ -56,7 +70,10 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
             embed.unsqueeze(0), # [1, B, d_out]
             weight=(cycle_mse * torch.ones(len(embeds), device=embed.device)).scatter_(0, torch.tensor(i, device=embed.device), 0).reshape(len(embeds), 1, 1) # [N, 1, 1]
         ) for i, (self_cycle_embed, embed) in enumerate(zip(self_cycle_embeds, embeds))
-    ]).mean()
+    ])#.mean()
+
+    loss_cycle_consistency = (loss_cycle_consistency * mask).mean()
+
 
     # No distance metric loss from the universal geometry paper, use mse since we have paired embeddings are paired
     # TODO vectorize hidden loss, test hidden loss vs discriminator loss vs both
@@ -66,17 +83,21 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         latents.unsqueeze(1),
         weight = latent_mse,
     )
+    loss_latent_pairwise_mse = (loss_latent_pairwise_mse * mask).mean()
+
+
 
     # discriminator infer
     loss_dc_pred = 0
-    for latent in latents:
+    for i, latent in enumerate(latents):
         # [B, N]
         discriminator_outputs_infer = discriminator(latent)
         loss_dc_pred = loss_dc_pred + F.cross_entropy(
                 discriminator_outputs_infer, 
-                (1/len(latents) * torch.ones_like(discriminator_outputs_infer)) # target: all classes have equal probability, FIXME pending test for which is best
+                (1/len(latents) * torch.ones_like(discriminator_outputs_infer)), # target: all classes have equal probability, FIXME pending test for which is best
                 #torch.zeros_like(discriminator_outputs_infer),  # target: all classes have target of 0
                 #torch.ones_like(discriminator_outputs_infer), # target: all classes have target of 1
+                weight = cls_mask[i],
             ) / len(latents)
 
     loss_dc_train = 0
@@ -85,7 +106,8 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         discriminator_outputs_train = discriminator(latent)
         loss_dc_train = loss_dc_train + F.cross_entropy(
                 discriminator_outputs_train, 
-                (i * torch.ones(len(latent), device=latents.device)).long() # target class is model idx
+                (i * torch.ones(len(latent), device=latents.device)).long(), # target class is model idx
+                weight = cls_mask[i],
             ) / len(latents)
 
     # TODO optimize this to piggyback off of the either train or pred loss
