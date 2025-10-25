@@ -87,7 +87,7 @@ def plot_heatmap(
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     data_csv = create_csv_string(data, labels)
-    plt.savefig(out_file, metadata = data_csv)
+    plt.savefig(out_file, metadata = {'Plot data': data_csv})
     print(data_csv)
 
 def create_dir(dir):
