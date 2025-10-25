@@ -196,7 +196,7 @@ scheduler_dc = optim.lr_scheduler.OneCycleLR(
     pct_start=0.1
 )
 
-embeds_val = [embed.to(device) for embed in embeds_val]
+#embeds_val = [embed.to(device) for embed in embeds_val]
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 aug_strength = 0.8
