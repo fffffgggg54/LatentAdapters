@@ -25,7 +25,7 @@ import losses
 import io
 import csv
 
-out_dir = "outputs/basic_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -97,6 +97,7 @@ def create_dir(dir):
     return dir
 
 # FIXME inconsistent checkpoints?
+'''
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',
@@ -121,7 +122,19 @@ models_to_add = [
 ]
 model_names = [*base_adapter_models, *models_to_add]
 #model_names = base_adapter_models
+'''
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
 
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+    
+    'vit_pe_core_gigantic_patch14_448.fb',
+]
 
 @torch.compile()
 def fw_enc(model, x):

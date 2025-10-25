@@ -26,7 +26,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/basic_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
 expand = False
 separate_expand = False
 
@@ -38,21 +38,36 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-
+'''
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
-    'convformer_b36.sail_in22k_ft_in1k',
-    'vit_base_patch16_224.augreg_in21k_ft_in1k',
-    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convformer_b36.sail_in22k_ft_in1k',#
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',#
+    'vit_base_patch16_clip_224.openai_ft_in1k',#
     'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
     'vit_large_patch16_dinov3.lvd1689m',
-    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',#
 
-    'convnext_base.fb_in1k',
-    'beit3_large_patch16_224.in22k_ft_in1k',
-    'convnextv2_base.fcmae_ft_in1k',
+    'convnext_base.fb_in1k',#
+    'beit3_large_patch16_224.in22k_ft_in1k',#
+    'convnextv2_base.fcmae_ft_in1k',#
     'aimv2_large_patch14_224.apple_pt',
-    'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',
+    'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
+]
+'''
+base_adapter_models = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+    
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+    'text_qwen3_embedding_4b_bf16',
 ]
 
 if expand:
@@ -72,9 +87,11 @@ else:
 
 
 # TODO unnecesary, figure out a way to get embed dim/head without instantiating and loading weights for the whole model
-print("building models...")
-models = [timm.create_model(model_name, pretrained=True, num_classes=1000).eval() for model_name in tqdm.tqdm(model_names)]
-model_dims = [model.num_features for model in models]
+#print("building models...")
+#models = [timm.create_model(model_name, pretrained=True, num_classes=1000).eval() for model_name in tqdm.tqdm(model_names)]
+
+
+'''
 @torch.compile()
 def fw_enc(model, x):
     x = model.forward_features(x)
@@ -88,21 +105,22 @@ def fw_head(model, x):
     else:
         # vit
         return model.head(x)
+'''
 
 # TODO flexible paths
 print("loading train embeds...")
 embeds_train = [
     torch.load(
-        f'embeds/embeds_in1k_train_{model.default_cfg['architecture']}.{model.default_cfg['tag']}.pt',
+        f'embeds/embeds_cc12m_{model}.pt',
         map_location='cpu'
-    ).to(torch.bfloat16) for model in tqdm.tqdm(models)
+    ).to(torch.bfloat16) for model in tqdm.tqdm(model_names)
 ]
-
+model_dims = [embed.shape[1] for embed in embeds_train]
 embeds_val = [
     torch.load(
-        f'embeds/embeds_in1k_val_{model.default_cfg['architecture']}.{model.default_cfg['tag']}.pt',
+        f'embeds/embeds_in1k_val_{model}.pt',
         map_location='cpu'
-    ) for model in models
+    ) for model in model_names
 ]
 
 
