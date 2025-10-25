@@ -116,13 +116,14 @@ embeds_train = [
     ).to(torch.bfloat16) for model in tqdm.tqdm(model_names)
 ]
 model_dims = [embed.shape[1] for embed in embeds_train]
+'''
 embeds_val = [
     torch.load(
         f'embeds/embeds_in1k_val_{model}.pt',
         map_location='cpu'
     ) for model in model_names
 ]
-
+'''
 
 class EmbeddingDataset(torch.utils.data.Dataset):
     def __init__(self, embedsList):
@@ -232,7 +233,7 @@ for epoch in range(num_epochs):
             loss_dc_train = loss_dc_train + loss_dc.detach() * bs_train
             dc_correct_train = dc_correct_train + dc_acc * bs_train
 
-
+    '''
     loss_val = 0
     loss_dc_val = 0
     dc_correct_val = 0
@@ -248,14 +249,15 @@ for epoch in range(num_epochs):
             loss_val = loss_val + loss * bs_val
             loss_dc_val = loss_dc_val + loss_dc * bs_val
             dc_correct_val = dc_correct_val + dc_acc * bs_val
+    '''
     loss_train = loss_train / len(embeds_train[0])
     loss_dc_train = loss_dc_train / len(embeds_train[0])
     dc_acc_train = 100 * dc_correct_train / len(embeds_train[0])
-    loss_val = loss_val / len(embeds_val[0])
-    loss_dc_val = loss_dc_val / len(embeds_val[0])
-    dc_acc_val = 100 * dc_correct_val / len(embeds_val[0])
+    #loss_val = loss_val / len(embeds_val[0])
+    #loss_dc_val = loss_dc_val / len(embeds_val[0])
+    #dc_acc_val = 100 * dc_correct_val / len(embeds_val[0])
     print(f'epoch {epoch}: train loss: {loss_train.item()}, train dc loss: {loss_dc_train.item()}, train dc acc: {["{:.4f}".format(x) for x in dc_acc_train]}, ', end="")
-    print(f'val loss: {loss_val.item()}, val dc loss: {loss_dc_val.item()}, val dc acc: {["{:.4f}".format(x) for x in dc_acc_val]}')
+    #print(f'val loss: {loss_val.item()}, val dc loss: {loss_dc_val.item()}, val dc acc: {["{:.4f}".format(x) for x in dc_acc_val]}')
 
 
     # TODO proper output directory handling
