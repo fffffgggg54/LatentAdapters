@@ -26,9 +26,9 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE/"
-expand = True
-separate_expand = True
+out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining/"
+expand = False
+separate_expand = False
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -68,6 +68,12 @@ base_adapter_models = [
     'vit_pe_core_gigantic_patch14_448.fb',
     'text_pe_core_text',
     'text_qwen3_embedding_4b_bf16',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 
 if expand:
