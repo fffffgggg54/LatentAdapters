@@ -159,13 +159,13 @@ print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
 discriminator = nn.Sequential(
-        nn.Linear(adapter.hidden_dim, 128),
+        nn.Linear(adapter.hidden_dim, 512),
         nn.GELU(),
-        nn.Linear(128, len(model_names))
+        nn.Linear(512, len(model_names))
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 40
+num_epochs = 10
 lr = 1e-4
 dc_lr = 3e-5
 bs_train = 2**10
