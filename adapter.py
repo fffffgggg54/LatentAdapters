@@ -81,7 +81,7 @@ class Adapter(nn.Module):
         self, 
         model_names: list, 
         model_dims: list, 
-        hidden_dim = 8192, 
+        hidden_dim = 4096, 
         middle_model = mmID
     ):
         super().__init__()
