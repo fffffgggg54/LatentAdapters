@@ -26,7 +26,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_12288_discriminator1.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -146,7 +146,7 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
-adapter_hidden_dim = 2048
+adapter_hidden_dim = 12288
 
 if expand:
     adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)], hidden_dim = adapter_hidden_dim,)
