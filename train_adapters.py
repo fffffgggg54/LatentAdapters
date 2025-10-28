@@ -26,7 +26,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_discriminator1.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -146,8 +146,10 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
+adapter_hidden_dim = 2048
+
 if expand:
-    adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)])
+    adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)], hidden_dim = adapter_nidden_dim,)
     #adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True, map_location='cpu'))
     adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_39.pt", weights_only=True, map_location='cpu'))
     for model in base_adapter_models:
@@ -157,7 +159,7 @@ if expand:
         )
     adapter.expand([x.replace('.', '_') for x in models_to_add], model_dims[len(base_adapter_models):])
 else:
-    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
+    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims, hidden_dim = adapter_nidden_dim,)
 
 
 adapter = adapter.to(device)
