@@ -26,7 +26,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
