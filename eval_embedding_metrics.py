@@ -171,9 +171,9 @@ if __name__ == '__main__':
     for model in model_names:
         adapter.load_state_dict_for_one_model(
             model.replace('.', '_'), 
-            torch.load(out_dir + f"adapter_{model}_epoch_39.pt", weights_only=True, map_location='cpu')
+            torch.load(out_dir + f"adapter_{model}_epoch_9.pt", weights_only=True, map_location='cpu')
         )
-    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_39.pt", weights_only=True, map_location='cpu'))
+    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_9.pt", weights_only=True, map_location='cpu'))
     adapter = adapter.to(device).float()
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')
