@@ -27,7 +27,9 @@ import csv
 
 import torchmetrics
 
-out_dir = "outputs/scratch_mmID_12288_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent1.0_MSE_JointTraining/"
+adapter_hidden_dim = 2048
+epoch = 99
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -163,7 +165,7 @@ if __name__ == '__main__':
 
     model_dims = [embed.shape[1] for embed in embeds_val]
 
-    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
+    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims, hidden_dim = adapter_hidden_dim)
     #adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
     #adapter.load_state_dict(torch.load('adapters/adapter_20251014_weights_only.pt', weights_only=True))
     #adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True))
@@ -171,9 +173,9 @@ if __name__ == '__main__':
     for model in model_names:
         adapter.load_state_dict_for_one_model(
             model.replace('.', '_'), 
-            torch.load(out_dir + f"adapter_{model}_epoch_9.pt", weights_only=True, map_location='cpu')
+            torch.load(out_dir + f"adapter_{model}_epoch_{epoch}.pt", weights_only=True, map_location='cpu')
         )
-    adapter.middle_model.load_state_dict(torch.load(out_dir + "adapter_middle_model_epoch_9.pt", weights_only=True, map_location='cpu'))
+    adapter.middle_model.load_state_dict(torch.load(out_dir + f"adapter_middle_model_epoch_{epoch}.pt", weights_only=True, map_location='cpu'))
     adapter = adapter.to(device).float()
     #adapter = torch.load('adapters/adapter_20251014-192543_epoch_99.pt', weights_only=False)
     #torch.save(adapter.state_dict(), 'adapters/adapter_20251014_weights_only.pt')

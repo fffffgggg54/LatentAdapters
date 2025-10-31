@@ -25,7 +25,9 @@ import losses
 import io
 import csv
 
-out_dir = "outputs/scratch_mmID_12288_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent1.0_MSE_JointTraining/"
+adapter_hidden_dim = 2048
+epoch = 99
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -508,7 +510,7 @@ if __name__ == '__main__':
     ]
 
     labels_val = torch.load('labels_in1k_val.pt', map_location='cpu')
-    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims)
+    adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims, hidden_dim = adapter_hidden_dim)
     #adapter.load_state_dict(torch.load('adapters/adapter_latent_mse_no_discriminator_20251015-111701_epoch_99.pt', weights_only=True))
     #adapter.load_state_dict(torch.load('adapters/adapter_20251014_weights_only.pt', weights_only=True))
     #adapter.load_state_dict(torch.load(out_dir + "adapter_epoch_99.pt", weights_only=True))
