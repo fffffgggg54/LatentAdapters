@@ -25,7 +25,7 @@ import losses
 import io
 import csv
 
-out_dir = "outputs/scratch_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_12288_discriminator1.0_latent1.0_MSE_JointTraining/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
