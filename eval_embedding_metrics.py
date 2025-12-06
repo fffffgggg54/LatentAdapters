@@ -7,7 +7,7 @@ import timm
 import timm.data
 import timm.optim
 
-import tqdm
+from tqdm import tqdm
 
 from PIL import Image
 
@@ -138,12 +138,12 @@ model_names = [
 ]
 
 def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
-    bs_val = 128
+    bs_val = 2000
 
-    metrics_latents = get_metrics(adapter_hidden_dim)
+    metrics_to_compute = get_metrics(adapter_hidden_dim)
 
-    results_latents = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_latents.keys()}
-    results_embeds = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_latents.keys()}
+    results_latents = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_to_compute.keys()}
+    results_embeds = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_to_compute.keys()}
 
     #metrics_latents = metrics.clone()
     #metrics_embeds = metrics.clone()
@@ -155,9 +155,10 @@ def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
         with torch.autocast(device.type, dtype=autocast_dtype):
             for in_model_idx in range(len(embeds_val)):
                 for out_model_idx in range(len(embeds_val)):
-                    metric_tracker_latents = torchmetrics.MetricCollection(metrics_latents).to(device)
+                    metric_tracker_latents = torchmetrics.MetricCollection(get_metrics(adapter_hidden_dim)).to(device)
                     metric_tracker_embeds = torchmetrics.MetricCollection(get_metrics_fn(adapter.model_dims[out_model_idx])).to(device)
-                    for embeds in zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)]):
+                    print(f"({in_model_idx}, {out_model_idx})")
+                    for embeds in tqdm(zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)])):
                         embeds = [embed.to(device, non_blocking=True).float() for embed in embeds]
                         in_latents = adapter.fw_one_embed_to_latent(embeds[0], adapter.model_names[in_model_idx])
                         out_latents = adapter.fw_one_embed_to_latent(embeds[1], adapter.model_names[out_model_idx])
@@ -169,7 +170,7 @@ def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
                     pair_results_embeds = metric_tracker_embeds.compute()
                     del metric_tracker_latents
                     del metric_tracker_embeds
-                    for key in metrics_latents.keys():
+                    for key in metrics_to_compute.keys():
                         results_latents[key][in_model_idx][out_model_idx] = pair_results_latents[key]
                         results_embeds[key][in_model_idx][out_model_idx] = pair_results_embeds[key]
 
@@ -193,8 +194,8 @@ class PCACosineSimilarity(Metric):
 
     def compute(self):
         # Concatenate all batches
-        all_preds = torch.cat(self.preds, dim=0)
-        all_target = torch.cat(self.target, dim=0)
+        all_preds = torch.cat(self.preds, dim=0).float()
+        all_target = torch.cat(self.target, dim=0).float()
         
         # Combine data to learn a common PCA space (or you can fit on just one)
         # Here we fit on the concatenation of both to ensure a shared subspace
@@ -204,11 +205,12 @@ class PCACosineSimilarity(Metric):
         mean = torch.mean(combined_data, dim=0)
         centered_data = combined_data - mean
         
-        # Perform PCA using SVD
-        # U, S, V = torch.pca_lowrank(centered_data, q=self.n_components, center=False)
-        # Or standard SVD if exactness is required:
         with torch.autocast(device.type, enabled=False):
-            _, _, V = torch.svd(centered_data.float())
+            centered_data = centered_data.float()
+            # Perform PCA using SVD
+            _, _, V = torch.pca_lowrank(centered_data, q=self.n_components, center=False)
+            # Or standard SVD if exactness is required:
+            #_, _, V = torch.svd(centered_data)
         
         # Select top k components (Principal Components)
         components = V[:, :self.n_components]
@@ -253,14 +255,15 @@ class MeanOutputWrapper(Metric):
         self.base_metric.reset()
 
 def get_metrics(dim):
+    # kendall and cosine are slow and memory intensive
     metrics_to_track = {
         "Uniform R-squared": torchmetrics.R2Score(multioutput='uniform_average'),
         "Weighted R-squared": torchmetrics.R2Score(multioutput='variance_weighted'),
         "Uniform Explained Variance": torchmetrics.ExplainedVariance(multioutput='uniform_average'),
         "Weighted Explained Variance": torchmetrics.ExplainedVariance(multioutput='variance_weighted'),
-        "Kendall Rank Correlation Coefficient": MeanOutputWrapper(torchmetrics.KendallRankCorrCoef(num_outputs = dim)),
+        #"Kendall Rank Correlation Coefficient": MeanOutputWrapper(torchmetrics.KendallRankCorrCoef(num_outputs = dim)),
         "Pearson Correlation Coefficient": MeanOutputWrapper(torchmetrics.PearsonCorrCoef(num_outputs = dim)),
-        "Cosine Similarity (PCA dim 64)": PCACosineSimilarity(n_components = 64),
+        #"Cosine Similarity (PCA dim 64)": PCACosineSimilarity(n_components = 64),
         #"Cosine Similarity": torchmetrics.CosineSimilarity(reduction = 'mean')
     }
     return metrics_to_track

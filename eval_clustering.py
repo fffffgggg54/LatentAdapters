@@ -7,7 +7,7 @@ import torch
 
 
 out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-file_path = out_dir + "Pairwise Weighted R-squared of Latents.png"
+file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Latents.png"
 
 def read_csv_from_image(image_path):
     """
