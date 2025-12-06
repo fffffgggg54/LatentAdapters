@@ -26,10 +26,12 @@ import io
 import csv
 
 import torchmetrics
+from torchmetrics import Metric
+from torchmetrics.functional import cosine_similarity
 
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent1.0_MSE_JointTraining/"
-adapter_hidden_dim = 2048
-epoch = 99
+out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+adapter_hidden_dim = 4096
+epoch = 39
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -99,7 +101,7 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -118,39 +120,150 @@ model_names = [
     'convnext_base.fb_in1k',
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
+'''
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
+    'convformer_b36.sail_in22k_ft_in1k',#
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',#
+    'vit_base_patch16_clip_224.openai_ft_in1k',#
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',#
 
-def compute_embedding_metrics(adapter, embeds_val, metrics):
-    bs_val = 100
+    'convnext_base.fb_in1k',#
+    'beit3_large_patch16_224.in22k_ft_in1k',#
+    'convnextv2_base.fcmae_ft_in1k',#
+    'aimv2_large_patch14_224.apple_pt',
+    'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
+]
 
-    results_latents = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics.keys()}
-    results_embeds = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics.keys()}
+def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
+    bs_val = 128
 
-    metrics_latents = metrics.clone()
-    metrics_embeds = metrics.clone()
+    metrics_latents = get_metrics(adapter_hidden_dim)
 
-    embeds_val = [embed.to(device).float() for embed in embeds_val]
+    results_latents = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_latents.keys()}
+    results_embeds = {k: torch.zeros(len(embeds_val), len(embeds_val)) for k in metrics_latents.keys()}
+
+    #metrics_latents = metrics.clone()
+    #metrics_embeds = metrics.clone()
+
+    #embeds_val = [embed.to(device).float() for embed in embeds_val]
 
     # TODO symmetric matrices?
-    for in_model_idx in range(len(embeds_val)):
-        for out_model_idx in range(len(embeds_val)):
-            metrics_latents.reset()
-            metrics_embeds.reset()
-            for embeds in zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)]):
-                in_latents = adapter.fw_one_embed_to_latent(embeds[0], adapter.model_names[in_model_idx])
-                out_latents = adapter.fw_one_embed_to_latent(embeds[1], adapter.model_names[out_model_idx])
-                metrics_latents.update(in_latents, out_latents)
-                adapted_embeds = adapter.fw_latent_to_one_embed(in_latents, adapter.model_names[out_model_idx])
-                metrics_embeds.update(adapted_embeds, embeds[1])
-            
-            pair_results_latents = metrics_latents.compute()
-            pair_results_embeds = metrics_embeds.compute()
-            for key in metrics.keys():
-                results_latents[key][in_model_idx][out_model_idx] = pair_results_latents[key]
-                results_embeds[key][in_model_idx][out_model_idx] = pair_results_embeds[key]
+    with torch.inference_mode():
+        with torch.autocast(device.type, dtype=autocast_dtype):
+            for in_model_idx in range(len(embeds_val)):
+                for out_model_idx in range(len(embeds_val)):
+                    metric_tracker_latents = torchmetrics.MetricCollection(metrics_latents).to(device)
+                    metric_tracker_embeds = torchmetrics.MetricCollection(get_metrics_fn(adapter.model_dims[out_model_idx])).to(device)
+                    for embeds in zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)]):
+                        embeds = [embed.to(device, non_blocking=True).float() for embed in embeds]
+                        in_latents = adapter.fw_one_embed_to_latent(embeds[0], adapter.model_names[in_model_idx])
+                        out_latents = adapter.fw_one_embed_to_latent(embeds[1], adapter.model_names[out_model_idx])
+                        metric_tracker_latents.update(in_latents, out_latents)
+                        adapted_embeds = adapter.fw_latent_to_one_embed(in_latents, adapter.model_names[out_model_idx])
+                        metric_tracker_embeds.update(adapted_embeds, embeds[1])
+                    
+                    pair_results_latents = metric_tracker_latents.compute()
+                    pair_results_embeds = metric_tracker_embeds.compute()
+                    del metric_tracker_latents
+                    del metric_tracker_embeds
+                    for key in metrics_latents.keys():
+                        results_latents[key][in_model_idx][out_model_idx] = pair_results_latents[key]
+                        results_embeds[key][in_model_idx][out_model_idx] = pair_results_embeds[key]
 
     print(results_latents)
     print(results_embeds)
     return results_latents, results_embeds
+
+class PCACosineSimilarity(Metric):
+    def __init__(self, n_components: int, dist_sync_on_step=False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.n_components = n_components
+        
+        # States to accumulate the predictions and targets over batches
+        self.add_state("preds", default=[], dist_reduce_fx="cat")
+        self.add_state("target", default=[], dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        # preds and target are expected to be (Batch_Size, Feature_Dim)
+        self.preds.append(preds)
+        self.target.append(target)
+
+    def compute(self):
+        # Concatenate all batches
+        all_preds = torch.cat(self.preds, dim=0)
+        all_target = torch.cat(self.target, dim=0)
+        
+        # Combine data to learn a common PCA space (or you can fit on just one)
+        # Here we fit on the concatenation of both to ensure a shared subspace
+        combined_data = torch.cat([all_preds, all_target], dim=0)
+        
+        # Center the data (crucial for PCA)
+        mean = torch.mean(combined_data, dim=0)
+        centered_data = combined_data - mean
+        
+        # Perform PCA using SVD
+        # U, S, V = torch.pca_lowrank(centered_data, q=self.n_components, center=False)
+        # Or standard SVD if exactness is required:
+        with torch.autocast(device.type, enabled=False):
+            _, _, V = torch.svd(centered_data.float())
+        
+        # Select top k components (Principal Components)
+        components = V[:, :self.n_components]
+        
+        # Project preds and targets into the reduced dimensional space
+        preds_reduced = torch.matmul(all_preds - mean, components)
+        target_reduced = torch.matmul(all_target - mean, components)
+        
+        # Calculate Cosine Similarity on the reduced vectors
+        # reduction='mean' returns the average similarity across all samples
+        return cosine_similarity(preds_reduced, target_reduced, reduction='mean')
+
+class MeanOutputWrapper(Metric):
+    """
+    Wraps a torchmetric that returns multiple outputs (e.g., a vector of correlations
+    per channel) and reduces them to a single scalar mean.
+    """
+    def __init__(self, base_metric: Metric):
+        super().__init__()
+        # By assigning the base_metric to self, torchmetrics registers it 
+        # as a submodule, handling device movement and state dicts automatically.
+        self.base_metric = base_metric
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        # Pass data directly to the underlying metric
+        self.base_metric.update(preds, target)
+
+    def compute(self):
+        # Get the multi-dimensional result from the base metric
+        results = self.base_metric.compute()
+        
+        # Check if result is a tuple (some metrics return val, p_val)
+        # We assume we want the mean of the first element (the score)
+        if isinstance(results, tuple):
+            results = results[0]
+            
+        # Reduce to a single scalar average
+        return results.mean()
+
+    def reset(self):
+        super().reset()
+        self.base_metric.reset()
+
+def get_metrics(dim):
+    metrics_to_track = {
+        "Uniform R-squared": torchmetrics.R2Score(multioutput='uniform_average'),
+        "Weighted R-squared": torchmetrics.R2Score(multioutput='variance_weighted'),
+        "Uniform Explained Variance": torchmetrics.ExplainedVariance(multioutput='uniform_average'),
+        "Weighted Explained Variance": torchmetrics.ExplainedVariance(multioutput='variance_weighted'),
+        "Kendall Rank Correlation Coefficient": MeanOutputWrapper(torchmetrics.KendallRankCorrCoef(num_outputs = dim)),
+        "Pearson Correlation Coefficient": MeanOutputWrapper(torchmetrics.PearsonCorrCoef(num_outputs = dim)),
+        "Cosine Similarity (PCA dim 64)": PCACosineSimilarity(n_components = 64),
+        #"Cosine Similarity": torchmetrics.CosineSimilarity(reduction = 'mean')
+    }
+    return metrics_to_track
 
 if __name__ == '__main__':
     # TODO flexible paths
@@ -185,19 +298,9 @@ if __name__ == '__main__':
     print(model_names)
     print([x[0].shape for x in embeds_val])
 
-    metrics_to_track = {
-        "Uniform R-squared": torchmetrics.R2Score(multioutput='uniform_average'),
-        "Weighted R-squared": torchmetrics.R2Score(multioutput='variance_weighted'),
-        "Uniform Explained Variance": torchmetrics.ExplainedVariance(multioutput='uniform_average'),
-        "Weighted Explained Variance": torchmetrics.ExplainedVariance(multioutput='variance_weighted'),
-        #"Cosine Similarity": torchmetrics.CosineSimilarity(reduction = 'mean')
-    }
+    results_latents, results_embeds = compute_embedding_metrics(adapter, embeds_val, get_metrics)
 
-    metric_tracker = torchmetrics.MetricCollection(metrics_to_track).to(device)
-
-    results_latents, results_embeds = compute_embedding_metrics(adapter, embeds_val, metric_tracker)
-
-    for key in metric_tracker.keys():
+    for key in get_metrics(adapter_hidden_dim).keys():
         
         plot_heatmap(
             results_latents[key],

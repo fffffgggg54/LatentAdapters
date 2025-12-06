@@ -25,9 +25,9 @@ import losses
 import io
 import csv
 
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent1.0_MSE_JointTraining/"
-adapter_hidden_dim = 2048
-epoch = 99
+out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+adapter_hidden_dim = 4096
+epoch = 39
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -99,7 +99,7 @@ def create_dir(dir):
     return dir
 
 # FIXME inconsistent checkpoints?
-'''
+
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',
@@ -143,7 +143,7 @@ model_names = [
     'convnext_base.fb_in1k',
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
-
+'''
 @torch.compile()
 def fw_enc(model, x):
     x = model.forward_features(x)
@@ -190,8 +190,8 @@ def train_probe_on_embeddings(
     emb_ds_val = EmbeddingDataset([labels_val, *embeds_val])
     bs_train = bs or 2**14
     bs_train = bs_train // grad_accum_iters
-    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=10, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=1)
-    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=10, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=1)
+    loader_train = timm.data.loader.MultiEpochsDataLoader(emb_ds_train, batch_size=bs_train, num_workers=20, shuffle=True, pin_memory=True, persistent_workers=True, prefetch_factor=1)
+    loader_val = timm.data.loader.MultiEpochsDataLoader(emb_ds_val, batch_size=bs_train, num_workers=20, shuffle=False, pin_memory=True, persistent_workers=True, prefetch_factor=1)
     # FIXME hardcoded class count
     if shared:
         probes = nn.Linear(adapter.hidden_dim, 1000).to(device)
