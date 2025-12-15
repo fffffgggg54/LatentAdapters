@@ -1,3 +1,7 @@
+import os
+os.environ['HF_HOME'] = '/scratch/fyguan/hf_home'
+os.environ['TORCH_HOME'] = '/scratch/fyguan/torch_home'
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
