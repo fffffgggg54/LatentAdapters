@@ -166,7 +166,7 @@ else:
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims, hidden_dim = adapter_hidden_dim,)
 
 
-adapter = adapter.to(device)
+adapter = adapter.to(device, non_blocking=True)
 print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
