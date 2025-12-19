@@ -30,7 +30,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator0.0_latent10.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator10.0_latent4.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -172,6 +172,8 @@ print(model_names)
 print([x[0].shape for x in embeds_train])
 discriminator = nn.Sequential(
         nn.Linear(adapter.hidden_dim, 512),
+        nn.GELU(),
+        nn.Linear(512, 512),
         nn.GELU(),
         nn.Linear(512, len(model_names))
     ).to(device)
