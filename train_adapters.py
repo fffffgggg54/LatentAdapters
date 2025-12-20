@@ -180,8 +180,8 @@ discriminator = nn.Sequential(
 
 # TODO these should arguments/cfg file
 num_epochs = 100
-lr = 1e-4
-dc_lr = 3e-5
+lr = 3e-5
+dc_lr = 1e-5
 bs_train = 2**10
 grad_accum_iters = 1
 bs_val = 250
