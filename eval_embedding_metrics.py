@@ -29,9 +29,9 @@ import torchmetrics
 from torchmetrics import Metric
 from torchmetrics.functional import cosine_similarity
 
-out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-adapter_hidden_dim = 4096
-epoch = 39
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator10.0_latent4.0_MSE_JointTraining/"
+adapter_hidden_dim = 2048
+epoch = 99
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
