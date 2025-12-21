@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('QtAgg')
 import pandas as pd
 from PIL import Image
 import io
