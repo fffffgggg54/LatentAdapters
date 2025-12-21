@@ -36,7 +36,8 @@ df.set_index('Model Name', inplace=True)
 print(df)
 
 sns.clustermap(df)
-plt.show()
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (no norm) of {file_path.split('/')[-1].split('.')[0]}.png')
 
 row_norm_tensor = torch.tensor(df.iloc[:, :].values.astype(float))
 row_norm_tensor = row_norm_tensor / row_norm_tensor.diag().unsqueeze(0)
@@ -46,10 +47,12 @@ col_norm_tensor = col_norm_tensor / col_norm_tensor.diag().unsqueeze(1)
 
 df.iloc[:, :] = row_norm_tensor.numpy()
 sns.clustermap(df)
-plt.show()
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (row norm) of {file_path.split('/')[-1].split('.')[0]}.png')
 
 df.iloc[:, :] = col_norm_tensor.numpy()
 sns.clustermap(df)
-plt.show()
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (col norm) of {file_path.split('/')[-1].split('.')[0]}.png')
 
 
