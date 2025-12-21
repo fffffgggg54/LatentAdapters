@@ -7,7 +7,7 @@ import torch
 
 
 out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining/"
-file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Latents (mscoco).png"
+file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Adapted Embeds (mscoco).png"
 
 def read_csv_from_image(image_path):
     """
