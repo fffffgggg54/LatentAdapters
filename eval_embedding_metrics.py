@@ -101,7 +101,7 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-'''
+
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -136,7 +136,7 @@ model_names = [
     'aimv2_large_patch14_224.apple_pt',
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
-
+'''
 def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
     bs_val = 2000
 
