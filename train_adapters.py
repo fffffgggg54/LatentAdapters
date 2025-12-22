@@ -30,7 +30,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator10.0_latent4.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -179,7 +179,7 @@ discriminator = nn.Sequential(
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 100
+num_epochs = 10
 lr = 3e-5
 dc_lr = 1e-5
 bs_train = 2**10
