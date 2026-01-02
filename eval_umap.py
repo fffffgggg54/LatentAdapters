@@ -129,6 +129,7 @@ def scatter_plot_with_legend(coordinates, labels, class_names, tag):
     # Save the figure
     #plt.savefig(out_dir + f'in1k_val_full_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
     plt.savefig(out_dir + f'mscoco_captions2017_test_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    plt.close()
     #plt.show()
 
 

@@ -90,6 +90,7 @@ def plot_heatmap(
     plt.tight_layout()
     data_csv = create_csv_string(data, labels)
     plt.savefig(out_file, metadata = {'Plot data': data_csv})
+    plt.close()
     print(data_csv)
 
 def create_dir(dir):
