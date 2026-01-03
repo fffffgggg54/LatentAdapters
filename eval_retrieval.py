@@ -262,7 +262,7 @@ def main():
         all_adapted_embeds_normalized = [F.normalize(x, p=2, dim=-1) for x in all_adapted_embeds]
         #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
         
-        embeds_val_normalized = [F.normalize(x.to(device, non_blocking=True), p=2, dim=-1) for x in embeds_val]
+        embeds_val_normalized = [F.normalize(x.to(device, non_blocking=True).float(), p=2, dim=-1) for x in embeds_val]
     
     
     
