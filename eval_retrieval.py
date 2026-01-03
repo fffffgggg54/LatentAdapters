@@ -129,6 +129,7 @@ def compute_retrieval_metrics(query_embeds, key_embeds, k_values=[1, 5, 10], do_
     return metrics
 
 def print_stats(matrix, metric_name, labels):
+    matrix = matrix * 100
     n = len(matrix)
     
     diagonal = np.diag(matrix)
@@ -204,9 +205,9 @@ def main():
             for j, queries in enumerate(all_latents_normalized):
                 metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
-                r1_matrix[i, j] = metrics['R@1'] * 100
-                r5_matrix[i, j] = metrics['R@5'] * 100
-                r10_matrix[i, j] = metrics['R@10'] * 100
+                r1_matrix[i, j] = metrics['R@1']
+                r5_matrix[i, j] = metrics['R@5']
+                r10_matrix[i, j] = metrics['R@10']
                 
                 pbar.update(1)
     
@@ -250,9 +251,9 @@ def main():
     
     print(f"\nKey findings:")
     mask = ~np.eye(n_models, dtype=bool)
-    print(f"  Average cross-model R@1:  {r1_matrix[mask].mean():.2f}%")
-    print(f"  Average cross-model R@5:  {r5_matrix[mask].mean():.2f}%")
-    print(f"  Average cross-model R@10: {r10_matrix[mask].mean():.2f}%")
+    print(f"  Average cross-model R@1:  {r1_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@5:  {r5_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@10: {r10_matrix[mask].mean() * 100:.2f}%")
     
     print("Running retrieval on embeds")
     with torch.inference_mode():
@@ -278,9 +279,9 @@ def main():
             for j, queries in enumerate(current_model_queries):
                 metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
-                r1_matrix[i, j] = metrics['R@1'] * 100
-                r5_matrix[i, j] = metrics['R@5'] * 100
-                r10_matrix[i, j] = metrics['R@10'] * 100
+                r1_matrix[i, j] = metrics['R@1']
+                r5_matrix[i, j] = metrics['R@5']
+                r10_matrix[i, j] = metrics['R@10']
                 
                 pbar.update(1)
     
@@ -322,6 +323,12 @@ def main():
         fmt=".2%"
     )
     
+    print(f"\nKey findings:")
+    mask = ~np.eye(n_models, dtype=bool)
+    print(f"  Average cross-model R@1:  {r1_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@5:  {r5_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@10: {r10_matrix[mask].mean() * 100:.2f}%")
+    
     print("Adapt embeds")
     
     n_models = len(model_names)
@@ -334,9 +341,9 @@ def main():
             for i, embeds in enumerate(current_model_embeds):
                 metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
-                r1_matrix[i, j] = metrics['R@1'] * 100
-                r5_matrix[i, j] = metrics['R@5'] * 100
-                r10_matrix[i, j] = metrics['R@10'] * 100
+                r1_matrix[i, j] = metrics['R@1']
+                r5_matrix[i, j] = metrics['R@5']
+                r10_matrix[i, j] = metrics['R@10']
                 
                 pbar.update(1)
     
@@ -377,6 +384,12 @@ def main():
         out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (R@10, mscoco caption2017).png",
         fmt=".2%"
     )
+    
+    print(f"\nKey findings:")
+    mask = ~np.eye(n_models, dtype=bool)
+    print(f"  Average cross-model R@1:  {r1_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@5:  {r5_matrix[mask].mean() * 100:.2f}%")
+    print(f"  Average cross-model R@10: {r10_matrix[mask].mean() * 100:.2f}%")
     
     
 
