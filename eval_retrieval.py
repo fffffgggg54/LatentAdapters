@@ -255,20 +255,15 @@ def main():
     print(f"  Average cross-model R@10: {r10_matrix[mask].mean():.2f}%")
     
     print("Running retrieval on embeds")
-    all_adapted_embeds = []
-    for embeds in torch.split(all_latents, bs_val, 1):
-        with torch.inference_mode():
-            # [N, N, bs, D]
-            adapted_embeds = torch.cat(adapter.fw_latent_to_all_embeds(all_latents), dim=0)
-            all_adapted_embeds.append(adapted_embeds)
-    # [N, N, B, D]
-    # out_model, in_model, batch_idx, dim
-    all_adapted_embeds = torch.cat(all_adapted_embeds, dim=2)
-    all_adapted_embeds = all_adapted_embeds.transpose(0, 1)
-    all_adapted_embeds_normalized = F.normalize(all_adapted_embeds, p=2, dim=-1)
-    #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
-    
-    embeds_val_normalized = F.normalize(torch.cat(embeds_val, dim=0), p=2, dim=-1)#.to('cpu', non_blocking=True)
+    with torch.inference_mode():
+        # [N, N, B, D]
+        # out_model, in_model, batch_idx, dim
+        all_adapted_embeds = adapter.fw_latent_to_all_embeds(all_latents)
+        all_adapted_embeds = all_adapted_embeds.transpose(0, 1)
+        all_adapted_embeds_normalized = F.normalize(all_adapted_embeds, p=2, dim=-1)
+        #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
+        
+        embeds_val_normalized = F.normalize(torch.cat(embeds_val, dim=0), p=2, dim=-1)#.to('cpu', non_blocking=True)
     
     
     
@@ -280,8 +275,8 @@ def main():
     r10_matrix = np.zeros((n_models, n_models))
     
     with tqdm(total=n_models**2, desc="Evaluating") as pbar:
-        for i, embeds in enumerate(embeds_val_normalized):
-            for j, queries in enumerate(all_adapted_embeds_normalized):
+        for i, (embeds, current_model_queries) in enumerate(zip(embeds_val_normalized, all_adapted_embeds_normalized)):
+            for j, queries in enumerate(current_model_queries):
                 metrics = compute_retrieval_metrics(queries[i], embeds, k_values=[1, 5, 10], do_norm=False)
                 
                 r1_matrix[i, j] = metrics['R@1'] * 100
@@ -336,9 +331,9 @@ def main():
     r10_matrix = np.zeros((n_models, n_models))
     
     with tqdm(total=n_models**2, desc="Evaluating") as pbar:
-        for i, embeds in enumerate(all_adapted_embeds_normalized):
-            for j, queries in enumerate(embeds_val_normalized):
-                metrics = compute_retrieval_metrics(queries, embeds[j], k_values=[1, 5, 10], do_norm=False)
+        for j, (queries, current_model_embeds) in enumerate(zip(embeds_val_normalized, all_adapted_embeds_normalized)):
+            for i, embeds in enumerate(current_model_embeds):
+                metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
                 r1_matrix[i, j] = metrics['R@1'] * 100
                 r5_matrix[i, j] = metrics['R@5'] * 100
