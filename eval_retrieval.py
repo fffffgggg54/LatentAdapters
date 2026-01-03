@@ -259,8 +259,7 @@ def main():
         # [N, N, B, D]
         # out_model, in_model, batch_idx, dim
         all_adapted_embeds = adapter.fw_latent_to_all_embeds(all_latents)
-        all_adapted_embeds = all_adapted_embeds
-        all_adapted_embeds_normalized = F.normalize(all_adapted_embeds, p=2, dim=-1)
+        all_adapted_embeds_normalized = [F.normalize(x, p=2, dim=-1) for x in all_adapted_embeds]
         #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
         
         embeds_val_normalized = F.normalize(torch.cat(embeds_val, dim=0), p=2, dim=-1)#.to('cpu', non_blocking=True)
