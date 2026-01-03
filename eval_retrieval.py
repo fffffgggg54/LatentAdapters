@@ -244,7 +244,7 @@ def main():
         "Recall@10",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval of Latents (mscoco caption2017).png",
+        out_file=out_dir + "Pairwise Retrieval of Latents (R@10, mscoco caption2017).png",
         fmt=".2%"
     )
     
