@@ -218,34 +218,34 @@ def main():
     plot_heatmap(
         r1_matrix,
         model_names,
-        "Pairwise Retrieval of Latents (mscoco caption2017)",
+        "Pairwise Retrieval of Latents (R@1, mscoco caption2017)",
         "Recall@1",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval of Latents (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval of Latents (R@1, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r5_matrix,
         model_names,
-        "Pairwise Retrieval of Latents (mscoco caption2017)",
+        "Pairwise Retrieval of Latents (R@5, mscoco caption2017)",
         "Recall@5",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval of Latents (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval of Latents (R@5, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r10_matrix,
         model_names,
-        "Pairwise Retrieval of Latents (mscoco caption2017)",
+        "Pairwise Retrieval of Latents (R@10, mscoco caption2017)",
         "Recall@10",
         x_label="Embed model",
         y_label="Query model",
         out_file=out_dir + "Pairwise Retrieval of Latents (mscoco caption2017).png",
-        fmt=".2"
+        fmt=".2%"
     )
     
     print(f"\nKey findings:")
@@ -292,34 +292,34 @@ def main():
     plot_heatmap(
         r1_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Queries (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Queries (R@1, mscoco caption2017)",
         "Recall@1",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (R@1, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r5_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Queries (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Queries (R@5, mscoco caption2017)",
         "Recall@5",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (R@5, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r10_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Queries (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Queries (R@10, mscoco caption2017)",
         "Recall@10",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Queries (R@10, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     print("Adapt embeds")
@@ -348,34 +348,34 @@ def main():
     plot_heatmap(
         r1_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Embeds (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Embeds (R@1, mscoco caption2017)",
         "Recall@1",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (R@1, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r5_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Embeds (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Embeds (R@5, mscoco caption2017)",
         "Recall@5",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (R@5, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     plot_heatmap(
         r10_matrix,
         model_names,
-        "Pairwise Retrieval with Adapted Embeds (mscoco caption2017)",
+        "Pairwise Retrieval with Adapted Embeds (R@10, mscoco caption2017)",
         "Recall@10",
         x_label="Embed model",
         y_label="Query model",
-        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (mscoco caption2017).png",
-        fmt=".2"
+        out_file=out_dir + "Pairwise Retrieval with Adapted Embeds (R@10, mscoco caption2017).png",
+        fmt=".2%"
     )
     
     
