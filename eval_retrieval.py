@@ -276,7 +276,7 @@ def main():
     with tqdm(total=n_models**2, desc="Evaluating") as pbar:
         for i, (embeds, current_model_queries) in enumerate(zip(embeds_val_normalized, all_adapted_embeds_normalized)):
             for j, queries in enumerate(current_model_queries):
-                metrics = compute_retrieval_metrics(queries[i], embeds, k_values=[1, 5, 10], do_norm=False)
+                metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
                 r1_matrix[i, j] = metrics['R@1'] * 100
                 r5_matrix[i, j] = metrics['R@5'] * 100
