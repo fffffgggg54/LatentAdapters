@@ -37,34 +37,35 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 
-def compute_retrieval_metrics(query_embeds, key_embeds, k_values=[1, 5, 10], do_norm = True):
-    if do_norm:
-        query_embeds = F.normalize(query_embeds, p=2, dim=1)
-        key_embeds = F.normalize(key_embeds, p=2, dim=1)
+# Gemini-2.5-pro, format data as image metadata
+def create_csv_string(tensor, names):
+    """
+    Generates a CSV-formatted string from an nxn tensor and a list of n names.
 
-    similarity = query_embeds @ key_embeds.T
-    
-    # We assume the i-th query matches the i-th key
-    n = similarity.shape[0]
-    gt_indices = torch.arange(n, device=similarity.device)
-        
-    gt_scores = similarity[torch.arange(n), torch.arange(n)]
+    Args:
+        tensor: An 1xn or nxn list of lists (the tensor).
+        names: A list of n strings (the names).
 
-    higher_score_mask = similarity > gt_scores.unsqueeze(1) 
-    
-    gt_ranks = higher_score_mask.sum(dim=1)
-    
-    gt_ranks_1based = gt_ranks.float() + 1
-    
-    metrics = {}
-    for k in k_values:
-        recall = (gt_ranks < k).float().mean().item()
-        metrics[f'R@{k}'] = recall
-        
-    metrics['mean_rank'] = gt_ranks_1based.mean().item()
-    metrics['median_rank'] = gt_ranks_1based.median().item()
-    
-    return metrics
+    Returns:
+        A string in CSV format.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write the header row
+    header = ["Model Name"] + names
+    writer.writerow(header)
+    torch.set_printoptions(sci_mode=False)
+    # Write the data rows
+    for i, row in enumerate(tensor):
+        if len(tensor) == len(names):
+            row = [names[i]] + row.tolist()
+        elif len(tensor) == 1:
+            row = [""] + row.tolist()
+        else: break
+        writer.writerow(row)
+
+    return output.getvalue()
 
 def plot_heatmap(
     data, 
@@ -96,6 +97,35 @@ def plot_heatmap(
     plt.savefig(out_file, metadata = {'Plot data': data_csv})
     plt.close()
     #print(data_csv)
+
+def compute_retrieval_metrics(query_embeds, key_embeds, k_values=[1, 5, 10], do_norm = True):
+    if do_norm:
+        query_embeds = F.normalize(query_embeds, p=2, dim=1)
+        key_embeds = F.normalize(key_embeds, p=2, dim=1)
+
+    similarity = query_embeds @ key_embeds.T
+    
+    # We assume the i-th query matches the i-th key
+    n = similarity.shape[0]
+    gt_indices = torch.arange(n, device=similarity.device)
+        
+    gt_scores = similarity[torch.arange(n), torch.arange(n)]
+
+    higher_score_mask = similarity > gt_scores.unsqueeze(1) 
+    
+    gt_ranks = higher_score_mask.sum(dim=1)
+    
+    gt_ranks_1based = gt_ranks.float() + 1
+    
+    metrics = {}
+    for k in k_values:
+        recall = (gt_ranks < k).float().mean().item()
+        metrics[f'R@{k}'] = recall
+        
+    metrics['mean_rank'] = gt_ranks_1based.mean().item()
+    metrics['median_rank'] = gt_ranks_1based.median().item()
+    
+    return metrics
 
 def print_stats(matrix, metric_name, labels):
     n = len(matrix)
