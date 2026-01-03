@@ -73,7 +73,8 @@ def plot_heatmap(
     cbar_label, 
     x_label = "Original backbone of classifier head", 
     y_label = "Backbone model", 
-    out_file = "plot.png"
+    out_file = "plot.png",
+    fmt='.2%'
 ):
     plt.figure(figsize=(16, 14))
     heatmap = sns.heatmap(data,
@@ -82,7 +83,7 @@ def plot_heatmap(
                         cmap='RdBu',
                         center=0,
                         annot=True,
-                        fmt='.2%',
+                        fmt=fmt,
                         square=True,
                         cbar_kws={'label': cbar_label})
 
@@ -160,7 +161,7 @@ def main():
             all_latents.append(latents)
     all_latents = torch.cat(all_latents, dim=1)
     all_latents_normalized = F.normalize(all_latents, p=2, dim=-1)
-    all_latents_normalized = all_latents_normalized.to('cpu', non_blocking=True)
+    #all_latents_normalized = all_latents_normalized.to('cpu', non_blocking=True)
     
     n_models = len(model_names)
     r1_matrix = np.zeros((n_models, n_models))
@@ -234,9 +235,9 @@ def main():
     all_adapted_embeds = torch.cat(all_adapted_embeds, dim=2)
     all_adapted_embeds = all_adapted_embeds.transpose(0, 1)
     all_adapted_embeds_normalized = F.normalize(all_adapted_embeds, p=2, dim=-1)
-    all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
+    #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
     
-    embeds_val_normalized = F.normalize(torch.cat(embeds_val, dim=0), p=2, dim=-1).to('cpu', non_blocking=True)
+    embeds_val_normalized = F.normalize(torch.cat(embeds_val, dim=0), p=2, dim=-1)#.to('cpu', non_blocking=True)
     
     
     
