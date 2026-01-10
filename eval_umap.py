@@ -37,9 +37,9 @@ import pandas as pd
 
 from sklearn.decomposition import PCA
 
-out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-adapter_hidden_dim = 4096
-epoch = 39
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator2.0_latent4.0_MSE_JointTraining/"
+adapter_hidden_dim = 2048
+epoch = 99
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -50,6 +50,28 @@ def create_dir(dir):
         print("Created Directory : ", dir)
     return dir
 
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+    
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+    'text_qwen3_embedding_4b_bf16',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+]
+    
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',#
@@ -65,7 +87,7 @@ model_names = [
     'aimv2_large_patch14_224.apple_pt',
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
-
+'''
 def scatter_plot_with_legend(coordinates, labels, class_names, tag):
     """
     Generates a scatter plot with a legend from numpy arrays and a class name dictionary using Seaborn.
@@ -105,7 +127,9 @@ def scatter_plot_with_legend(coordinates, labels, class_names, tag):
     data_csv = df.to_csv(index=False)
 
     # Save the figure
-    plt.savefig(out_dir + f'in1k_val_full_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    #plt.savefig(out_dir + f'in1k_val_full_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    plt.savefig(out_dir + f'mscoco_captions2017_test_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    plt.close()
     #plt.show()
 
 
@@ -168,7 +192,8 @@ if __name__ == '__main__':
 
     embeds_val = [
         torch.load(
-            f'embeds/embeds_in1k_val_{model}.pt',
+            #f'embeds/embeds_in1k_val_{model}.pt',
+            f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
         ) for model in model_names
     ]

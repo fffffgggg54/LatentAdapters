@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import torch
 
 
-out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Latents.png"
+out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator2.0_latent4.0_MSE_JointTraining/"
+file_path = out_dir + "Pairwise Retrieval of Latents (R@1, mscoco caption2017).png"
 
 def read_csv_from_image(image_path):
     """
@@ -34,7 +34,9 @@ df.set_index('Model Name', inplace=True)
 print(df)
 
 sns.clustermap(df)
-plt.show()
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (no norm) of {file_path.split('/')[-1].split('.')[0]}.png')
+plt.close()
 
 row_norm_tensor = torch.tensor(df.iloc[:, :].values.astype(float))
 row_norm_tensor = row_norm_tensor / row_norm_tensor.diag().unsqueeze(0)
@@ -44,10 +46,13 @@ col_norm_tensor = col_norm_tensor / col_norm_tensor.diag().unsqueeze(1)
 
 df.iloc[:, :] = row_norm_tensor.numpy()
 sns.clustermap(df)
-plt.show()
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (row norm) of {file_path.split('/')[-1].split('.')[0]}.png')
+plt.close()
 
 df.iloc[:, :] = col_norm_tensor.numpy()
 sns.clustermap(df)
-plt.show()
-
+#plt.show()
+plt.savefig(out_dir + f'Clustermap (col norm) of {file_path.split('/')[-1].split('.')[0]}.png')
+plt.close()
 

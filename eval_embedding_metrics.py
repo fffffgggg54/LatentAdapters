@@ -29,9 +29,9 @@ import torchmetrics
 from torchmetrics import Metric
 from torchmetrics.functional import cosine_similarity
 
-out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
-adapter_hidden_dim = 4096
-epoch = 39
+out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining/"
+adapter_hidden_dim = 8192
+epoch = 9
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -94,6 +94,7 @@ def plot_heatmap(
     plt.tight_layout()
     data_csv = create_csv_string(data, labels)
     plt.savefig(out_file, metadata = {'Plot data': data_csv})
+    plt.close()
     #print(data_csv)
 
 def create_dir(dir):
@@ -101,7 +102,7 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-'''
+
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -113,6 +114,8 @@ model_names = [
     'aimv2_large_patch14_224.apple_pt',
     
     'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+    'text_qwen3_embedding_4b_bf16',
 
     'convformer_b36.sail_in22k_ft_in1k',
     'vit_base_patch16_224.augreg_in21k_ft_in1k',
@@ -136,7 +139,7 @@ model_names = [
     'aimv2_large_patch14_224.apple_pt',
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
-
+'''
 def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
     bs_val = 2000
 
@@ -274,7 +277,8 @@ if __name__ == '__main__':
 
     embeds_val = [
         torch.load(
-            f'embeds/embeds_in1k_val_{model}.pt',
+            #f'embeds/embeds_in1k_val_{model}.pt',
+            f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
         ) for model in model_names
     ]
@@ -308,22 +312,22 @@ if __name__ == '__main__':
         plot_heatmap(
             results_latents[key],
             model_names,
-            "Pairwise " + key + " of Latents",
+            "Pairwise " + key + " of Latents (mscoco)",
             key,
             x_label="Backbone 2",
             y_label="Backbone 1",
-            out_file=out_dir + "Pairwise " + key + " of Latents.png",
+            out_file=out_dir + "Pairwise " + key + " of Latents (mscoco).png",
             fmt=".3"
         )
         
         plot_heatmap(
             results_embeds[key],
             model_names,
-            "Pairwise " + key + " of Adapted Embeds",
+            "Pairwise " + key + " of Adapted Embeds (mscoco)",
             key,
             x_label="Target model",
             y_label="Backbone model",
-            out_file=out_dir + "Pairwise " + key + " of Adapted Embeds.png",
+            out_file=out_dir + "Pairwise " + key + " of Adapted Embeds (mscoco).png",
             fmt=".3"
         )
         

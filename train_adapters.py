@@ -30,7 +30,7 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator2.0_latent4.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -166,20 +166,22 @@ else:
     adapter = Adapter([x.replace('.', '_') for x in model_names], model_dims, hidden_dim = adapter_hidden_dim,)
 
 
-adapter = adapter.to(device)
+adapter = adapter.to(device, non_blocking=True)
 print(adapter)
 print(model_names)
 print([x[0].shape for x in embeds_train])
 discriminator = nn.Sequential(
         nn.Linear(adapter.hidden_dim, 512),
         nn.GELU(),
+        nn.Linear(512, 512),
+        nn.GELU(),
         nn.Linear(512, len(model_names))
     ).to(device)
 
 # TODO these should arguments/cfg file
-num_epochs = 100
-lr = 1e-4
-dc_lr = 3e-5
+num_epochs = 10
+lr = 3e-5
+dc_lr = 1e-5
 bs_train = 2**10
 grad_accum_iters = 1
 bs_val = 250
