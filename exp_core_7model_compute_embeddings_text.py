@@ -185,7 +185,7 @@ def compute_embeddings_bert(model_name):
     # Base batch size per GPU
     base_bs = 128
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name, attn_implementation="sdpa").to(device)
+    model = AutoModel.from_pretrained(model_name, attn_implementation="sdpa", trust_remote_code=True).to(device)
 
     model_tag = model_name.split('/')[1].replace('-', '_')
     
