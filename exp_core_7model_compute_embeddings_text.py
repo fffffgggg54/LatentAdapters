@@ -195,7 +195,8 @@ def compute_embeddings_bert(model_name):
     all_batches = []
     
     for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing {model_name} embeddings for {label}"):
-        with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
+        # disable compiler for gh200, since some models have compile in the implementation
+        with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype), torch.compiler.disable(recursive=True):
             batch_dict = tokenizer(
                 textBatch,
                 max_length=model.config.max_position_embeddings,
