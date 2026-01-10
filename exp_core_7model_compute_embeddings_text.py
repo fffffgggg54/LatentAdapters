@@ -26,6 +26,9 @@ from PIL import Image
 
 import gc
 
+# disable compiler for gh200, since some models have compile in the implementation
+torch._dynamo.config.disable = True
+
 # Check for available GPUs
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -195,8 +198,7 @@ def compute_embeddings_bert(model_name):
     all_batches = []
     
     for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing {model_name} embeddings for {label}"):
-        # disable compiler for gh200, since some models have compile in the implementation
-        with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype), torch.compiler.disable(recursive=True):
+        with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
             batch_dict = tokenizer(
                 textBatch,
                 max_length=model.config.max_position_embeddings,
