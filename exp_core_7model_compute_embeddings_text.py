@@ -49,10 +49,10 @@ class ImageOnlyDataset(torch.utils.data.Dataset):
             image = self.transform(image)
         return image, 0
 
-#ds = datasets.load_dataset('laion/conceptual-captions-12m-webdataset')['train']
-#label = "cc12m_text"
-ds = datasets.load_dataset('clip-benchmark/wds_mscoco_captions2017')['test']
-label = "mscoco_captions2017_test_text"
+ds = datasets.load_dataset('laion/conceptual-captions-12m-webdataset')['train']
+label = "cc12m_text"
+#ds = datasets.load_dataset('clip-benchmark/wds_mscoco_captions2017')['test']
+#label = "mscoco_captions2017_test_text"
 
 ds_train = ImageOnlyDataset(ds, column = 'txt')
 
