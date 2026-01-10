@@ -90,7 +90,7 @@ def compute_embeddings_qwen():
     
     all_batches = []
     
-    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing embeddings for {label}"):
+    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing {model_name} embeddings for {label}"):
         with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
             batch_dict = tokenizer(
                 textBatch,
@@ -130,7 +130,7 @@ def compute_embeddings_openclip():
     
     all_batches = []
     
-    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing embeddings for {label}"):
+    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing {model_name} embeddings for {label}"):
         with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
             text = tokenizer(textBatch, context_length=model.context_length).to(device)
             embedsBatch = model.encode_text(text)
@@ -147,7 +147,7 @@ def compute_embeddings_openclip():
 
 def compute_embeddings_e5():
     # Base batch size per GPU
-    base_bs = 128
+    base_bs = 1024
     model_name = "intfloat/e5-large-v2"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name, attn_implementation="sdpa").to(device)
@@ -159,7 +159,7 @@ def compute_embeddings_e5():
     
     all_batches = []
     
-    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing embeddings for {label}"):
+    for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing {model_name} embeddings for {label}"):
         with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
             batch_dict = tokenizer(
                 textBatch,
@@ -186,7 +186,7 @@ def compute_embeddings_e5():
 # any model that takes the first embedding of the last layer as the output
 def compute_embeddings_bert(model_name):
     # Base batch size per GPU
-    base_bs = 128
+    base_bs = 512
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name, attn_implementation="sdpa", trust_remote_code=True).to(device)
 
