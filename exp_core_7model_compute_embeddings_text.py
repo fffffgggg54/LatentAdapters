@@ -46,7 +46,8 @@ class ImageOnlyDataset(torch.utils.data.Dataset):
             image = self.transform(image)
         return image, 0
 
-ds = datasets.load_dataset('laion/conceptual-captions-12m-webdataset')['train']
+#ds = datasets.load_dataset('laion/conceptual-captions-12m-webdataset')['train']
+ds = datasets.load_dataset('clip-benchmark/wds_mscoco_captions2017')['test']
 ds_train = ImageOnlyDataset(ds, column = 'txt')
 
 def last_token_pool(last_hidden_states, attention_mask):
@@ -68,16 +69,16 @@ task = 'Given an image caption, retrieve relevant images that match the caption'
 
 def compute_embeddings_qwen():
     # Base batch size per GPU
-    base_bs = 64
-    model_name = "Qwen/Qwen3-Embedding-0.6B"
+    base_bs = 128
+    model_name = "Qwen/Qwen3-Embedding-4B"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name).to(device)
+    model = AutoModel.from_pretrained(model_name, attn_implementation="sdpa").to(device)
 
-    label = "cc12m_text"
-    model_tag = "qwen3_embedding_0.6b"
+    label = "mscoco_captions2017_test_text"
+    model_tag = "qwen3_embedding_4b_bf16"
     
-    num_workers = 30
-    loader = torch.utils.data.DataLoader(ds_train, batch_size=total_bs, num_workers=num_workers)
+    num_workers = 6
+    loader = torch.utils.data.DataLoader(ds_train, batch_size=base_bs, num_workers=num_workers)
     
     all_batches = []
     
@@ -90,9 +91,10 @@ def compute_embeddings_qwen():
             )
             batch_dict.to(model.device)
             outputs = model(**batch_dict)
-            embedsBatch = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+            embedsBatch = last_token_pool(outputs.last_hidden_state, batch_dict['attention_mask']).to('cpu', non_blocking=True).bfloat16()
+            all_batches.append(embedsBatch)
 
-    embeds = torch.cat(embedsBatch, dim=0)
+    embeds = torch.cat(all_batches, dim=0)
 
     save_path = f'/scratch/fyguan/embeds_{label}_{model_tag}.pt'
     print(f"Saving embeddings to {save_path}")
@@ -104,25 +106,28 @@ def compute_embeddings_qwen():
 
 def compute_embeddings_openclip():
     # Base batch size per GPU
-    base_bs = 64
+    base_bs = 512
     model_id = 'hf-hub:timm/PE-Core-bigG-14-448'
     model, _, preprocess = open_clip.create_model_and_transforms(model_id)
+    # don't use the final clip text projection layer
+    model.text_projection=None
+    model = model.to(device).eval()
     tokenizer = open_clip.get_tokenizer(model_id)
 
-    label = "cc12m_text"
+    label = "mscoco_captions2017_test_text"
     model_tag = "pe_core_text"
     
-    num_workers = 30
-    loader = torch.utils.data.DataLoader(ds_train, batch_size=total_bs, num_workers=num_workers)
+    num_workers = 60
+    loader = torch.utils.data.DataLoader(ds_train, batch_size=base_bs, num_workers=num_workers)
     
     all_batches = []
     
     for textBatch, _ in tqdm.tqdm(loader, desc=f"Computing embeddings for {label}"):
         with torch.autograd.grad_mode.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=autocast_dtype):
-            batch_dict = tokenizer(textBatch, context_length=model.context_length)
-            batch_dict.to(model.device)
+            text = tokenizer(textBatch, context_length=model.context_length).to(device)
             embedsBatch = model.encode_text(text)
-    embeds = torch.cat(embedsBatch, dim=0)
+            all_batches.append(embedsBatch)
+    embeds = torch.cat(all_batches, dim=0)
 
     save_path = f'/scratch/fyguan/embeds_{label}_{model_tag}.pt'
     print(f"Saving embeddings to {save_path}")
@@ -134,6 +139,7 @@ def compute_embeddings_openclip():
 
 
 
-compute_embeddings_openclip()  
+compute_embeddings_openclip() 
 compute_embeddings_qwen()
+ 
     
