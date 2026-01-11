@@ -30,7 +30,8 @@ from adapter import Adapter
 import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
-out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
+#out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/scratch_v2_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -59,6 +60,7 @@ base_adapter_models = [
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
 '''
+'''
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -78,6 +80,36 @@ base_adapter_models = [
     'vit_base_patch16_clip_224.openai_ft_in1k',
     'convnext_base.fb_in1k',
     'beit3_large_patch16_224.in22k_ft_in1k',
+]
+'''
+base_adapter_models = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    'text_e5_large_v2',
+    'text_bert_large_uncased',
+    'text_roberta_large',
+    'text_gte_en_mlm_large',
+    'text_gte_large_en_v1.5',
+    'text_gte_modernbert_base',
+    'text_gte_multilingual_base',
+
 ]
 
 if expand:
@@ -150,7 +182,7 @@ class EmbeddingDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return tuple([embed[idx] for embed in self.embedsList])
 
-adapter_hidden_dim = 2048
+adapter_hidden_dim = 4096
 
 if expand:
     adapter = Adapter([x.replace('.', '_') for x in base_adapter_models], model_dims[:len(base_adapter_models)], hidden_dim = adapter_hidden_dim,)
@@ -182,8 +214,8 @@ discriminator = nn.Sequential(
 num_epochs = 10
 lr = 3e-5
 dc_lr = 1e-5
-bs_train = 2**10
-grad_accum_iters = 1
+bs_train = 2**8
+grad_accum_iters = 4
 bs_val = 250
 
 embeds_ds = EmbeddingDataset(embeds_train)

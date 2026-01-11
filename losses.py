@@ -15,7 +15,7 @@ def norm_MSE_variance(pred, targ, weight = 1):
     return ((weight * (pred - targ) ** 2).mean(dim=reduce_dims) / targ.var(dim=reduce_dims)).mean()
 
 # TODO embeds should be a dict to adapt a subset of adapters by key
-def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=1, dc_ce=10.0, loss_fn = MSE, zsl_idxs = None):
+def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, latent_aug_str = 0.6, self_mse=1, pw_mse=1, cycle_mse=1, latent_mse=1, dc_ce=1.0, loss_fn = MSE, zsl_idxs = None):
     # input shape of N * [B, d_in]
     # in_model, batch_idx, dim
 
@@ -94,8 +94,8 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         discriminator_outputs_infer = discriminator(latent)
         loss_dc_pred = loss_dc_pred + F.cross_entropy(
                 discriminator_outputs_infer, 
-                (1/len(latents) * torch.ones_like(discriminator_outputs_infer)), # target: all classes have equal probability, FIXME pending test for which is best
-                #torch.zeros_like(discriminator_outputs_infer),  # target: all classes have target of 0
+                #(1/len(latents) * torch.ones_like(discriminator_outputs_infer)), # target: all classes have equal probability, FIXME pending test for which is best
+                torch.zeros_like(discriminator_outputs_infer),  # target: all classes have target of 0
                 #torch.ones_like(discriminator_outputs_infer), # target: all classes have target of 1
                 weight = cls_mask[i],
             ) / len(latents)
