@@ -141,7 +141,7 @@ model_names = [
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
 '''
-base_adapter_models = [
+model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
     'vit_large_patch16_dinov3.lvd1689m',
