@@ -29,8 +29,8 @@ import torchmetrics
 from torchmetrics import Metric
 from torchmetrics.functional import cosine_similarity
 
-out_dir = "outputs/scratch_mmID_8192_discriminator1.0_latent1.0_MSE_JointTraining/"
-adapter_hidden_dim = 8192
+out_dir = "outputs/scratch_v2_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+adapter_hidden_dim = 4096
 epoch = 9
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -102,7 +102,7 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -124,6 +124,7 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 '''
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',#
@@ -140,6 +141,35 @@ model_names = [
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
 '''
+base_adapter_models = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    'text_e5_large_v2',
+    'text_bert_large_uncased',
+    'text_roberta_large',
+    'text_gte_en_mlm_large',
+    'text_gte_large_en_v1.5',
+    'text_gte_modernbert_base',
+    'text_gte_multilingual_base',
+
+]
 def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
     bs_val = 2000
 
