@@ -118,10 +118,10 @@ base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
 
     'vit_large_patch16_dinov3.lvd1689m',
-    'vit_huge_patch14_gap_224.in22k_ijepa',
+    #'vit_huge_patch14_gap_224.in22k_ijepa',
 
     'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
-    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    #'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
     'aimv2_large_patch14_224.apple_pt',
 
     'convformer_b36.sail_in22k_ft_in1k',
