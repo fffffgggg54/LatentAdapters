@@ -135,15 +135,15 @@ base_adapter_models = [
 
     'text_qwen3_embedding_4b_bf16',
     
-    'resnext101_32x32d.fb_wsl_ig1b_ft_in1k',
+    #'resnext101_32x32d.fb_wsl_ig1b_ft_in1k',
     'resnet152.tv2_in1k',
     'mobilenetv4_hybrid_large.e600_r384_in1k',
     'mobilenetv4_conv_large.e600_r384_in1k',
     'maxvit_base_tf_384.in21k_ft_in1k',
     'swin_large_patch4_window12_384.ms_in22k_ft_in1k',
-    'flexivit_large.1200ep_in1k',
-    'mambaout_base.in1k',
-    'davit_base.msft_in1k',
+    #'flexivit_large.1200ep_in1k',
+    #'mambaout_base.in1k',
+    #'davit_base.msft_in1k',
     'regnety_080.ra3_in1k',
 
 ]
