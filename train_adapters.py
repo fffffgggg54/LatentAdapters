@@ -31,7 +31,8 @@ import losses
 
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
 #out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
-out_dir = "outputs/scratch_v2_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+#out_dir = "outputs/scratch_v2_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
@@ -82,6 +83,7 @@ base_adapter_models = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 '''
+'''
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -109,6 +111,40 @@ base_adapter_models = [
     'text_gte_large_en_v1.5',
     'text_gte_modernbert_base',
     'text_gte_multilingual_base',
+
+]
+'''
+base_adapter_models = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    
+    'resnext101_32x32d.fb_wsl_ig1b_ft_in1k',
+    'resnet152.tv2_in1k',
+    'mobilenetv4_hybrid_large.e600_r384_in1k',
+    'mobilenetv4_conv_large.e600_r384_in1k',
+    'maxvit_base_tf_384.in21k_ft_in1k',
+    'swin_large_patch4_window12_384.ms_in22k_ft_in1k',
+    'flexivit_large.1200ep_in1k',
+    'mambaout_base.in1k',
+    'davit_base.msft_in1k',
+    'regnety_080.ra3_in1k',
 
 ]
 
