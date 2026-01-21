@@ -553,16 +553,17 @@ if __name__ == '__main__':
         torch.load(
             f'embeds/embeds_in1k_train_{model}.pt',
             map_location='cpu'
-        ) for model in model_names
+        ) for model in tqdm.tqdm(model_names)
     ]
 
     labels_train = torch.load('labels_in1k_train.pt', map_location='cpu')
 
+    print("loading val embeds...")
     embeds_val = [
         torch.load(
             f'embeds/embeds_in1k_val_{model}.pt',
             map_location='cpu'
-        ) for model in models
+        ) for model in tqdm.tqdm(model_names)
     ]
 
     model_dims = [embed.shape[1] for embed in embeds_val]
