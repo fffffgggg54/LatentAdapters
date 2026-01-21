@@ -25,9 +25,9 @@ import losses
 import io
 import csv
 
-out_dir = "outputs/basic_mmID_4096_discriminator1.0_latent1.0_MSE_JointTraining_NoExpansion/"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 adapter_hidden_dim = 4096
-epoch = 39
+epoch = 9
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -100,7 +100,7 @@ def create_dir(dir):
     return dir
 
 # FIXME inconsistent checkpoints?
-
+'''
 base_adapter_models = [
     'caformer_b36.sail_in22k_ft_in1k',
     'convformer_b36.sail_in22k_ft_in1k',
@@ -126,6 +126,7 @@ models_to_add = [
 model_names = [*base_adapter_models, *models_to_add]
 #model_names = base_adapter_models
 '''
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -145,6 +146,41 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 '''
+
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+    #'vit_huge_patch14_gap_224.in22k_ijepa',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    #'vit_so400m_patch14_siglip_gap_224.pali2_10b_pt',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    
+    #'resnext101_32x32d.fb_wsl_ig1b_ft_in1k',
+    'resnet152.tv2_in1k',
+    'mobilenetv4_hybrid_large.e600_r384_in1k',
+    'mobilenetv4_conv_large.e600_r384_in1k',
+    'maxvit_base_tf_384.in21k_ft_in1k',
+    'swin_large_patch4_window12_384.ms_in22k_ft_in1k',
+    #'flexivit_large.1200ep_in1k',
+    #'mambaout_base.in1k',
+    #'davit_base.msft_in1k',
+    'regnety_080.ra3_in1k',
+
+]
+
 @torch.compile()
 def fw_enc(model, x):
     x = model.forward_features(x)
