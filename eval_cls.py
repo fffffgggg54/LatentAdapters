@@ -202,7 +202,7 @@ def fw_head(model, x):
                 return model.head(x)
         else:
             model.get_classifier().to(device)
-            return model.forward_head(x)
+            return model.get_classifier()(x)
 
 class EmbeddingDataset(torch.utils.data.Dataset):
     def __init__(self, embedsList):
