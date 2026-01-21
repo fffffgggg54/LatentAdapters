@@ -524,12 +524,12 @@ def eval_cls_with_shared_latent_probe(probe, adapter, embeds_val, labels_val, to
     return correct_default, correct_adapted, correct_cycle, total
 
 if __name__ == '__main__':
-    '''
+    
     # TODO unnecesary, figure out a way to get embed dim/head without instantiating and loading weights for the whole model
     print("building models...")
     models = [timm.create_model(model_name, pretrained=True, num_classes=1000).eval() for model_name in tqdm.tqdm(model_names)]
     model_dims = [model.num_features for model in models]
-
+    '''
     # TODO flexible paths
     print("loading train embeds...")
     embeds_train = [
