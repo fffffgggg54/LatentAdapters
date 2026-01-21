@@ -192,13 +192,17 @@ def fw_head(model, x):
         model.to(device)
         return model(x)
     else:
-        model.head.to(device)
-        if hasattr(model.head, 'fc'):
-            # metaformer
-            return model.head.fc(x)
+        if hasattr(model, 'head'):
+            model.head.to(device)
+            if hasattr(model.head, 'fc'):
+                # metaformer
+                return model.head.fc(x)
+            else:
+                # vit
+                return model.head(x)
         else:
-            # vit
-            return model.head(x)
+            model.get_classifier().to(device)
+            return model.forward_head(x)
 
 class EmbeddingDataset(torch.utils.data.Dataset):
     def __init__(self, embedsList):
