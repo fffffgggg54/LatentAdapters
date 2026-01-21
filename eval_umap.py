@@ -37,9 +37,9 @@ import pandas as pd
 
 from sklearn.decomposition import PCA
 
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator2.0_latent4.0_MSE_JointTraining/"
-adapter_hidden_dim = 2048
-epoch = 99
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+adapter_hidden_dim = 4096
+epoch = 9
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -49,7 +49,7 @@ def create_dir(dir):
         os.makedirs(dir)
         print("Created Directory : ", dir)
     return dir
-
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -70,6 +70,7 @@ model_names = [
     'convnext_base.fb_in1k',
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
+'''
     
 '''
 model_names = [
@@ -88,6 +89,34 @@ model_names = [
     'convnext_base.clip_laion2b_augreg_ft_in12k_in1k',#
 ]
 '''
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    
+    'resnet152.tv2_in1k',
+    'mobilenetv4_hybrid_large.e600_r384_in1k',
+    'mobilenetv4_conv_large.e600_r384_in1k',
+    'maxvit_base_tf_384.in21k_ft_in1k',
+    'swin_large_patch4_window12_384.ms_in22k_ft_in1k',
+    'regnety_080.ra3_in1k',
+
+]
+
 def scatter_plot_with_legend(coordinates, labels, class_names, tag):
     """
     Generates a scatter plot with a legend from numpy arrays and a class name dictionary using Seaborn.
