@@ -38,6 +38,7 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 ]
 '''
+'''
 model_names = [
     'caformer_b36.sail_in22k_ft_in1k',
 
@@ -67,6 +68,35 @@ model_names = [
     'text_gte_multilingual_base',
 
 ]
+'''
+model_names = [
+    'caformer_b36.sail_in22k_ft_in1k',
+
+    'vit_large_patch16_dinov3.lvd1689m',
+
+    'eva02_base_patch14_448.mim_in22k_ft_in22k_in1k',
+    'aimv2_large_patch14_224.apple_pt',
+
+    'convformer_b36.sail_in22k_ft_in1k',
+    'vit_base_patch16_224.augreg_in21k_ft_in1k',
+    'vit_base_patch16_clip_224.openai_ft_in1k',
+    'convnext_base.fb_in1k',
+    'beit3_large_patch16_224.in22k_ft_in1k',
+
+    'vit_pe_core_gigantic_patch14_448.fb',
+    'text_pe_core_text',
+
+    'text_qwen3_embedding_4b_bf16',
+    
+    'resnet152.tv2_in1k',
+    'mobilenetv4_hybrid_large.e600_r384_in1k',
+    'mobilenetv4_conv_large.e600_r384_in1k',
+    'maxvit_base_tf_384.in21k_ft_in1k',
+    'swin_large_patch4_window12_384.ms_in22k_ft_in1k',
+    'regnety_080.ra3_in1k',
+
+]
+
 # Gemini-2.5-pro, format data as image metadata
 def create_csv_string(tensor, names):
     """
