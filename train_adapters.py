@@ -32,7 +32,7 @@ import losses
 #out_dir = "outputs/basic_discriminator1.0_latent1.0_MSE_expansion_AllAnchors_JointAddition/"
 #out_dir = "outputs/scratch_mmID_2048_10epoch_discriminator10.0_latent1.0_MSE_JointTraining/"
 #out_dir = "outputs/scratch_v2_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
-out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmGELU_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 expand = False
 separate_expand = False
 
