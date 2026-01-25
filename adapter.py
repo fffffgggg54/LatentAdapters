@@ -82,7 +82,7 @@ class Adapter(nn.Module):
         model_names: list, 
         model_dims: list, 
         hidden_dim = 4096, 
-        middle_model = mmID
+        middle_model = mmGELU
     ):
         super().__init__()
         self.model_names = model_names
