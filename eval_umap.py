@@ -37,7 +37,7 @@ import pandas as pd
 
 from sklearn.decomposition import PCA
 
-out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmGELU_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 adapter_hidden_dim = 4096
 epoch = 9
 
