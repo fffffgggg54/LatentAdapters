@@ -1,4 +1,10 @@
 # kNN purity and silhouette coefficient
+import os
+
+# adjust as needed
+os.environ["OPENBLAS_NUM_THREADS"] = "64" 
+os.environ["MKL_NUM_THREADS"] = "64" 
+os.environ["OMP_NUM_THREADS"] = "64" 
 
 import torch
 import torch.nn as nn
@@ -19,7 +25,6 @@ import seaborn as sns
 import math
 from datetime import datetime
 
-import os
 
 from adapter import Adapter
 import losses
