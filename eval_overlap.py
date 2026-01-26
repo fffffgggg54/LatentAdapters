@@ -207,15 +207,20 @@ def compute_knn_purity(X, y, tgt_cls, k=15):
     
     # Get labels of neighbors
     neighbor_labels = y[neighbor_indices]
-    
-    # Check if neighbor labels match the target class
-    matches = (neighbor_labels[y == tgt_cls] == tgt_cls)
-    
-    # Purity per point is the mean of matches across its neighbors
-    purity_per_point = matches.mean(axis=1)
-    
-    # Return global average purity
-    return purity_per_point.mean()
+
+    if tgt_cls is not None:
+        # Check if neighbor labels match the target class
+        matches = (neighbor_labels[y == tgt_cls] == tgt_cls)
+        
+        # Purity per point is the mean of matches across its neighbors
+        purity_per_point = matches.mean(axis=1)
+        
+        # Return global average purity
+        return purity_per_point.mean()
+    else:
+        purity_per_point = np.mean(neighbor_labels == y[:, np.newaxis], axis=1)
+        return purity_per_point
+
 
 # Gemini-3-pro, modified
 def pairwise_overlap_metrics(X, y, k=15):
@@ -227,8 +232,9 @@ def pairwise_overlap_metrics(X, y, k=15):
     """
     # Ensure y is 1D array
     y = np.array(y).ravel()
-    classes = np.array(y)
-    results = {k: torch.zeros(len(classes), len(classes)) for k in {'purity', 'silhouette'}}
+    classes = np.unique(y)
+    results_pairwise = {k: torch.zeros(len(classes), len(classes)) for k in {'purity', 'silhouette'}}
+    results_per_class = {k: torch.zeros(len(classes)) for k in {'purity', 'silhouette'}}
     
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
 
@@ -241,22 +247,28 @@ def pairwise_overlap_metrics(X, y, k=15):
         
         # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
         # returns -1 (wrong cluster) to +1 (dense, well separated)
-        sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1] if c1 != c2 else 1.0
+        sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1].mean() if c1 != c2 else 1.0
         
         # 2. Compute KNN Purity
         # returns 0 to 1
         purity_score = compute_knn_purity(X_pair, y_pair, c1, k=k)
         
-        results['silhouette'][c1][c2] = sil_score
-        results['purity'][c1][c2] = purity_score
+        results_pairwise['silhouette'][c1][c2] = sil_score
+        results_pairwise['purity'][c1][c2] = purity_score
 
-    return results
+    sil_score = silhouette_samples(X, y)
+    purity_score = compute_knn_purity(X, y, None, k=k)
+    for tgt_cls in classes:
+        results_per_class['silhouette'][tgt_cls] = sil_score[y == tgt_cls].mean()
+        results_per_class['purity'][tgt_cls] = purity_score[y == tgt_cls].mean()
+
+    return results_pairwise, results_per_class
 
 def plot_pairwise_overlap_metrics(coordinates, labels, model_names, tag, k=15):
-    results = pairwise_overlap_metrics(coordinates, labels, k=k)
+    results_pairwise, results_per_class = pairwise_overlap_metrics(coordinates, labels, k=k)
 
     plot_heatmap(
-        results['silhouette'],
+        results_pairwise['silhouette'],
         model_names,
         "Pairwise Silhouette Coefficient of " + tag,
         "Silhouette Coefficient",
@@ -267,13 +279,35 @@ def plot_pairwise_overlap_metrics(coordinates, labels, model_names, tag, k=15):
     )
 
     plot_heatmap(
-        results['purity'],
+        results_pairwise['purity'],
         model_names,
         "Pairwise kNN Purity of " + tag,
         "kNN Purity",
         x_label="Distractor Backbone",
         y_label="Focus Backbone",
         out_file=out_dir + "Pairwise kNN Purity of " + tag + ".png",
+        fmt=".3"
+    )
+
+    plot_heatmap(
+        results_per_class['silhouette'],
+        model_names,
+        "Per-model Silhouette Coefficient of " + tag,
+        "Silhouette Coefficient",
+        x_label="Model",
+        y_label="",
+        out_file=out_dir + "Per-model Silhouette Coefficient of " + tag + ".png",
+        fmt=".3"
+    )
+
+    plot_heatmap(
+        results_per_class['purity'],
+        model_names,
+        "Per-model kNN Purity of " + tag,
+        "kNN Purity",
+        x_label="Model",
+        y_label="",
+        out_file=out_dir + "Per-model kNN Purity of " + tag + ".png",
         fmt=".3"
     )
 
