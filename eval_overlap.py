@@ -361,7 +361,7 @@ if __name__ == '__main__':
             #f'embeds/embeds_in1k_val_{model}.pt',
             f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
-        ) for model in model_names
+        ) for model in tqdm.tqdm(model_names)
     ]
 
     model_dims = [embed.shape[1] for embed in embeds_val]
