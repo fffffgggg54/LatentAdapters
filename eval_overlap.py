@@ -238,7 +238,7 @@ def pairwise_overlap_metrics(X, y, k=15):
     
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
 
-    for c1, c2 in combinations(classes, 2):
+    for c1, c2 in tqdm.tqdm(combinations(classes, 2)):
         # Create mask for only the two current classes
         mask = (y == c1) | (y == c2)
         
@@ -312,7 +312,7 @@ def plot_pairwise_overlap_metrics(coordinates, labels, model_names, tag, k=15):
     )
 
 def plot_adapted_embeds(adapter, embeds_val, out_model, ds, pca_dim = None):
-    print(f"running embeds umap plot: adapting to {out_model}")
+    print(f"running embeds overlap plot: adapting to {out_model}")
     bs_val = 1000
 
     #embeds_val = [embed.to(device).float() for embed in embeds_val]
@@ -329,12 +329,14 @@ def plot_adapted_embeds(adapter, embeds_val, out_model, ds, pca_dim = None):
 
     metric_input = all_latents.reshape(-1, D)
     if pca_dim is not None:
+        print(f'running PCA (dim={pca_dim})')
         metric_input = PCA(n_components = pca_dim,).fit_transform(metric_input)
+        print('Done')
 
     plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Embeds Adapted to {out_model} on {ds}" + (f" (PCA dim {pca_dim}" if pca_dim else ""))
     
 def plot_latents_with_pca(adapter, embeds_val, ds, pca_dim):
-    print(f"running latents umap plot with pca dim {pca_dim}")
+    print(f"running latents overlap plot with pca dim {pca_dim}")
     bs_val = 1000
 
     #embeds_val = [embed.to(device).float() for embed in embeds_val]
@@ -348,7 +350,9 @@ def plot_latents_with_pca(adapter, embeds_val, ds, pca_dim):
     K, B, D = all_latents.shape
     src_models = torch.arange(K).unsqueeze(-1).repeat(1, B).reshape(-1).numpy()
 
+    print(f'running PCA (dim={pca_dim})')
     metric_input = PCA(n_components = pca_dim,).fit_transform(all_latents.reshape(-1, D))
+    print('Done')
 
     plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Latents on {ds}" + (f" (PCA dim {pca_dim}" if pca_dim else ""))
 
