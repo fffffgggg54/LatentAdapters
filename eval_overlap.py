@@ -214,14 +214,18 @@ def compute_knn_purity(X, y, tgt_cls, k=15):
     neighbor_labels = y[neighbor_indices]
 
     if tgt_cls is not None:
-        # Check if neighbor labels match the target class
-        matches = (neighbor_labels[y == tgt_cls] == tgt_cls)
+        # Filter rows where the query point belongs to tgt_cls
+        mask_tgt = (y == tgt_cls)
+        if not np.any(mask_tgt):
+            return 0.0
+            
+        relevant_neighbor_labels = neighbor_labels[mask_tgt]
         
-        # Purity per point is the mean of matches across its neighbors
-        purity_per_point = matches.mean(axis=1)
+        # Check matches
+        matches = (relevant_neighbor_labels == tgt_cls)
         
-        # Return global average purity
-        return purity_per_point.mean()
+        # Purity = mean match rate per point, then mean across points
+        return matches.mean(axis=1).mean()
     else:
         purity_per_point = np.mean(neighbor_labels == y[:, np.newaxis], axis=1)
         return purity_per_point
@@ -243,23 +247,25 @@ def pairwise_overlap_metrics(X, y, k=15):
     
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
 
-    for c1, c2 in tqdm.tqdm(combinations(classes, 2)):
-        # Create mask for only the two current classes
-        mask = (y == c1) | (y == c2)
-        
-        X_pair = X[mask]
-        y_pair = y[mask]
-        
-        # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
-        # returns -1 (wrong cluster) to +1 (dense, well separated)
-        sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1].mean() if c1 != c2 else 1.0
-        
-        # 2. Compute KNN Purity
-        # returns 0 to 1
-        purity_score = compute_knn_purity(X_pair, y_pair, c1, k=k)
-        
-        results_pairwise['silhouette'][c1][c2] = sil_score
-        results_pairwise['purity'][c1][c2] = purity_score
+    for c1 in range(len(embeds_val)):
+        for c2 in range(len(embeds_val)):
+            print(f"({c2}, {c1})")
+            # Create mask for only the two current classes
+            mask = (y == c1) | (y == c2)
+            
+            X_pair = X[mask]
+            y_pair = y[mask]
+            
+            # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
+            # returns -1 (wrong cluster) to +1 (dense, well separated)
+            sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1].mean() if c1 != c2 else 1.0
+            
+            # 2. Compute KNN Purity
+            # returns 0 to 1
+            purity_score = compute_knn_purity(X_pair, y_pair, c1, k=k)
+            
+            results_pairwise['silhouette'][c1][c2] = sil_score
+            results_pairwise['purity'][c1][c2] = purity_score
 
     sil_score = silhouette_samples(X, y)
     purity_score = compute_knn_purity(X, y, None, k=k)
