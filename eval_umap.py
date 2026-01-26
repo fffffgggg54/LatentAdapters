@@ -37,7 +37,7 @@ import pandas as pd
 
 from sklearn.decomposition import PCA
 
-out_dir = "outputs/final_mmGELU_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
 adapter_hidden_dim = 4096
 epoch = 9
 
@@ -104,9 +104,9 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 
     'vit_pe_core_gigantic_patch14_448.fb',
-    #'text_pe_core_text',
+    'text_pe_core_text',
 
-    #'text_qwen3_embedding_4b_bf16',
+    'text_qwen3_embedding_4b_bf16',
     
     'resnet152.tv2_in1k',
     'mobilenetv4_hybrid_large.e600_r384_in1k',
@@ -156,8 +156,8 @@ def scatter_plot_with_legend(coordinates, labels, class_names, tag):
     data_csv = df.to_csv(index=False)
 
     # Save the figure
-    plt.savefig(out_dir + f'in1k_val_full_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
-    #plt.savefig(out_dir + f'mscoco_captions2017_test_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    #plt.savefig(out_dir + f'in1k_val_full_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
+    plt.savefig(out_dir + f'mscoco_captions2017_test_densmap_clustering_{tag}.png', metadata = {'Plot data': data_csv})
     plt.close()
     #plt.show()
 
@@ -221,8 +221,8 @@ if __name__ == '__main__':
 
     embeds_val = [
         torch.load(
-            f'embeds/embeds_in1k_val_{model}.pt',
-            #f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
+            #f'embeds/embeds_in1k_val_{model}.pt',
+            f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
         ) for model in model_names
     ]
