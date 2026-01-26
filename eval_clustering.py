@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 import torch
 
 
-out_dir = "outputs/scratch_mmID_2048_100epoch_discriminator2.0_latent4.0_MSE_JointTraining/"
-file_path = out_dir + "Pairwise Retrieval of Latents (R@1, mscoco caption2017).png"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+#file_path = out_dir + "Pairwise Retrieval of Latents (R@1, mscoco caption2017).png"
+#file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Adapted Embeds (mscoco).png"
+file_path = out_dir + "Pairwise Pearson Correlation Coefficient of Latents (mscoco).png"
 
 def read_csv_from_image(image_path):
     """
