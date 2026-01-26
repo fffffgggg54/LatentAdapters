@@ -241,7 +241,7 @@ def pairwise_overlap_metrics(X, y, k=15):
         
         # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
         # returns -1 (wrong cluster) to +1 (dense, well separated)
-        sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1]
+        sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1] if c1 != c2 else 1.0
         
         # 2. Compute KNN Purity
         # returns 0 to 1
