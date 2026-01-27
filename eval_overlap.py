@@ -344,7 +344,7 @@ def plot_adapted_embeds(adapter, embeds_val, out_model, ds, pca_dim = None):
         metric_input = PCA(n_components = pca_dim,).fit_transform(metric_input)
         print('Done')
 
-    plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Embeds Adapted to {out_model} on {ds}" + (f" (PCA dim {pca_dim}" if pca_dim else ""))
+    plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Embeds Adapted to {out_model} on {ds}" + (f" (PCA dim {pca_dim})" if pca_dim else ""))
     
 def plot_latents_with_pca(adapter, embeds_val, ds, pca_dim):
     print(f"running latents overlap plot with pca dim {pca_dim}")
@@ -365,7 +365,7 @@ def plot_latents_with_pca(adapter, embeds_val, ds, pca_dim):
     metric_input = PCA(n_components = pca_dim,).fit_transform(all_latents.reshape(-1, D))
     print('Done')
 
-    plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Latents on {ds}" + (f" (PCA dim {pca_dim}" if pca_dim else ""))
+    plot_pairwise_overlap_metrics(metric_input, src_models, model_names, f"Latents on {ds}" + (f" (PCA dim {pca_dim})" if pca_dim else ""))
 
 if __name__ == '__main__':
     # TODO flexible paths
