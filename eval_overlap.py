@@ -110,9 +110,9 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 
     'vit_pe_core_gigantic_patch14_448.fb',
-    'text_pe_core_text',
+    #'text_pe_core_text',
 
-    'text_qwen3_embedding_4b_bf16',
+    #'text_qwen3_embedding_4b_bf16',
     
     'resnet152.tv2_in1k',
     'mobilenetv4_hybrid_large.e600_r384_in1k',
