@@ -116,5 +116,5 @@ def pairwise_adapter_loss_with_discriminator(adapter, discriminator, embeds, lat
         discriminator_targets = torch.arange(len(latents), device=latents.device).reshape(len(latents), 1).expand(len(latents), latents.shape[1])
         discriminator_accuracy = (discriminator(latents).argmax(dim=-1) == discriminator_targets).float().mean(dim=1)
 
-    loss = loss_reconstruction + loss_cycle_consistency + loss_dc_pred * dc_ce#+ loss_pairwise_hidden_mse
+    loss = loss_reconstruction + loss_cycle_consistency + loss_dc_pred * dc_ce + loss_latent_pairwise_mse
     return loss, loss_dc_train, loss_dc_pred.detach(), discriminator_accuracy
