@@ -247,8 +247,8 @@ def pairwise_overlap_metrics(X, y, k=15):
     
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
 
-    for c1 in range(len(embeds_val)):
-        for c2 in range(len(embeds_val)):
+    for c2 in range(len(embeds_val)):
+        for c1 in range(len(embeds_val)):
             print(f"({c2}, {c1})")
             # Create mask for only the two current classes
             mask = (y == c1) | (y == c2)
