@@ -405,9 +405,9 @@ if __name__ == '__main__':
 
     ds = "ImageNet-1k"
     #ds = 'COCO Captions 2017'
-    
+    '''
     for model in model_names:
         plot_adapted_embeds(adapter, embeds_val, model, ds, pca_dim = 256)
-    
+    '''
     plot_latents_with_pca(adapter, embeds_val, ds, 256)
 
