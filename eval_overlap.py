@@ -243,7 +243,7 @@ def pairwise_overlap_metrics(X, y, k=15):
     y = np.array(y).ravel()
     classes = np.unique(y)
     results_pairwise = {k: torch.zeros(len(classes), len(classes)) for k in {'purity', 'silhouette'}}
-    results_per_class = {k: torch.zeros(len(classes), 1) for k in {'purity', 'silhouette'}}
+    results_per_class = {k: torch.zeros(1, len(classes)) for k in {'purity', 'silhouette'}}
     
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
 
@@ -270,8 +270,8 @@ def pairwise_overlap_metrics(X, y, k=15):
     sil_score = silhouette_samples(X, y)
     purity_score = compute_knn_purity(X, y, None, k=k)
     for tgt_cls in classes:
-        results_per_class['silhouette'][tgt_cls][0] = sil_score[y == tgt_cls].mean()
-        results_per_class['purity'][tgt_cls][0] = purity_score[y == tgt_cls].mean()
+        results_per_class['silhouette'][0][tgt_cls] = sil_score[y == tgt_cls].mean()
+        results_per_class['purity'][0][tgt_cls] = purity_score[y == tgt_cls].mean()
 
     return results_pairwise, results_per_class
 
