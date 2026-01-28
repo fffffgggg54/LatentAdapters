@@ -29,7 +29,7 @@ import torchmetrics
 from torchmetrics import Metric
 from torchmetrics.functional import cosine_similarity
 
-out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining_ICMLRun/"
 adapter_hidden_dim = 4096
 epoch = 9
 
