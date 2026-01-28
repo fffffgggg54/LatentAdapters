@@ -43,7 +43,7 @@ from sklearn.metrics import silhouette_samples
 from itertools import combinations
 
 
-out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining/"
+out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointTraining_ICMLRun/"
 adapter_hidden_dim = 4096
 epoch = 9
 
@@ -373,8 +373,8 @@ if __name__ == '__main__':
 
     embeds_val = [
         torch.load(
-            f'embeds/embeds_in1k_val_{model}.pt',
-            #f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
+            #f'embeds/embeds_in1k_val_{model}.pt',
+            f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
         ) for model in tqdm.tqdm(model_names)
     ]
@@ -403,8 +403,8 @@ if __name__ == '__main__':
 
     #plot_latents(adapter, embeds_val)
 
-    ds = "ImageNet-1k"
-    #ds = 'COCO Captions 2017'
+    #ds = "ImageNet-1k"
+    ds = 'COCO Captions 2017'
     '''
     for model in model_names:
         plot_adapted_embeds(adapter, embeds_val, model, ds, pca_dim = 256)
