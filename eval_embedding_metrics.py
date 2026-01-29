@@ -34,7 +34,7 @@ adapter_hidden_dim = 4096
 epoch = 9
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 # Gemini-2.5-pro, format data as image metadata
 def create_csv_string(tensor, names):
@@ -214,27 +214,27 @@ def compute_embedding_metrics(adapter, embeds_val, get_metrics_fn):
 
     # TODO symmetric matrices?
     with torch.inference_mode():
-        #with torch.autocast(device.type, dtype=autocast_dtype):
-        for in_model_idx in range(len(embeds_val)):
-            for out_model_idx in range(len(embeds_val)):
-                metric_tracker_latents = torchmetrics.MetricCollection(get_metrics(adapter_hidden_dim)).to(device)
-                metric_tracker_embeds = torchmetrics.MetricCollection(get_metrics_fn(adapter.model_dims[out_model_idx])).to(device)
-                print(f"({in_model_idx}, {out_model_idx})")
-                for embeds in tqdm(zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)])):
-                    embeds = [embed.to(device, non_blocking=True).float() for embed in embeds]
-                    in_latents = adapter.fw_one_embed_to_latent(embeds[0], adapter.model_names[in_model_idx])
-                    out_latents = adapter.fw_one_embed_to_latent(embeds[1], adapter.model_names[out_model_idx])
-                    metric_tracker_latents.update(in_latents, out_latents)
-                    adapted_embeds = adapter.fw_latent_to_one_embed(in_latents, adapter.model_names[out_model_idx])
-                    metric_tracker_embeds.update(adapted_embeds, embeds[1])
-                
-                pair_results_latents = metric_tracker_latents.compute()
-                pair_results_embeds = metric_tracker_embeds.compute()
-                del metric_tracker_latents
-                del metric_tracker_embeds
-                for key in metrics_to_compute.keys():
-                    results_latents[key][in_model_idx][out_model_idx] = pair_results_latents[key]
-                    results_embeds[key][in_model_idx][out_model_idx] = pair_results_embeds[key]
+        with torch.autocast(device.type, dtype=autocast_dtype):
+            for in_model_idx in range(len(embeds_val)):
+                for out_model_idx in range(len(embeds_val)):
+                    metric_tracker_latents = torchmetrics.MetricCollection(get_metrics(adapter_hidden_dim)).to(device)
+                    metric_tracker_embeds = torchmetrics.MetricCollection(get_metrics_fn(adapter.model_dims[out_model_idx])).to(device)
+                    print(f"({in_model_idx}, {out_model_idx})")
+                    for embeds in tqdm(zip(*[torch.split(embeds_val[in_model_idx], bs_val, 0), torch.split(embeds_val[out_model_idx], bs_val, 0)])):
+                        embeds = [embed.to(device, non_blocking=True).float() for embed in embeds]
+                        in_latents = adapter.fw_one_embed_to_latent(embeds[0], adapter.model_names[in_model_idx])
+                        out_latents = adapter.fw_one_embed_to_latent(embeds[1], adapter.model_names[out_model_idx])
+                        metric_tracker_latents.update(in_latents, out_latents)
+                        adapted_embeds = adapter.fw_latent_to_one_embed(in_latents, adapter.model_names[out_model_idx])
+                        metric_tracker_embeds.update(adapted_embeds, embeds[1])
+                    
+                    pair_results_latents = metric_tracker_latents.compute()
+                    pair_results_embeds = metric_tracker_embeds.compute()
+                    del metric_tracker_latents
+                    del metric_tracker_embeds
+                    for key in metrics_to_compute.keys():
+                        results_latents[key][in_model_idx][out_model_idx] = pair_results_latents[key]
+                        results_embeds[key][in_model_idx][out_model_idx] = pair_results_embeds[key]
 
     print(results_latents)
     print(results_embeds)
