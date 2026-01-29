@@ -187,9 +187,9 @@ model_names = [
     'beit3_large_patch16_224.in22k_ft_in1k',
 
     'vit_pe_core_gigantic_patch14_448.fb',
-    'text_pe_core_text',
+    #'text_pe_core_text',
 
-    'text_qwen3_embedding_4b_bf16',
+    #'text_qwen3_embedding_4b_bf16',
     
     'resnet152.tv2_in1k',
     'mobilenetv4_hybrid_large.e600_r384_in1k',
@@ -334,10 +334,13 @@ if __name__ == '__main__':
     # TODO flexible paths
     print("loading train embeds...")
 
+    ds = "in1k"
+    #ds = "mscoco"
+    
     embeds_val = [
         torch.load(
-            #f'embeds/embeds_in1k_val_{model}.pt',
-            f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
+            f'embeds/embeds_in1k_val_{model}.pt',
+            #f'embeds/embeds_mscoco_captions2017_test_{model}.pt',
             map_location='cpu'
         ) for model in model_names
     ]
@@ -371,22 +374,22 @@ if __name__ == '__main__':
         plot_heatmap(
             results_latents[key],
             model_names,
-            "Pairwise " + key + " of Latents (mscoco)",
+            "Pairwise " + key + f" of Latents ({ds})",
             key,
             x_label="Backbone 2",
             y_label="Backbone 1",
-            out_file=out_dir + "Pairwise " + key + " of Latents (mscoco).png",
+            out_file=out_dir + "Pairwise " + key + f" of Latents ({ds}).png",
             fmt=".3"
         )
         
         plot_heatmap(
             results_embeds[key],
             model_names,
-            "Pairwise " + key + " of Adapted Embeds (mscoco)",
+            "Pairwise " + key + f" of Adapted Embeds ({ds})",
             key,
             x_label="Target model",
             y_label="Backbone model",
-            out_file=out_dir + "Pairwise " + key + " of Adapted Embeds (mscoco).png",
+            out_file=out_dir + "Pairwise " + key + f" of Adapted Embeds ({ds}).png",
             fmt=".3"
         )
         
