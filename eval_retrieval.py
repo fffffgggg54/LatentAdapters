@@ -265,7 +265,7 @@ def main():
     with tqdm(total=n_models**2, desc="Evaluating") as pbar:
         for i, embeds in enumerate(all_latents_normalized):
             for j, queries in enumerate(all_latents_normalized):
-                metrics = compute_retrieval_metrics(queries.to(device), embeds.to(device), k_values=[1, 5, 10], do_norm=False)
+                metrics = compute_retrieval_metrics(queries, embeds, k_values=[1, 5, 10], do_norm=False)
                 
                 r1_matrix[i, j] = metrics['R@1']
                 r5_matrix[i, j] = metrics['R@5']
