@@ -244,29 +244,30 @@ def pairwise_overlap_metrics(X, y, k=15):
     classes = np.unique(y)
     results_pairwise = {k: torch.zeros(len(classes), len(classes)) for k in {'purity', 'silhouette'}}
     results_per_class = {k: torch.zeros(1, len(classes)) for k in {'purity', 'silhouette'}}
-    
+    '''
     print(f"Computing metrics for {len(classes)} classes (Pairwise)...")
-
-    for c2 in range(len(embeds_val)):
-        for c1 in range(len(embeds_val)):
-            print(f"({c2}, {c1})")
-            # Create mask for only the two current classes
-            mask = (y == c1) | (y == c2)
-            
-            X_pair = X[mask]
-            y_pair = y[mask]
-            
-            # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
-            # returns -1 (wrong cluster) to +1 (dense, well separated)
-            sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1].mean() if c1 != c2 else 1.0
-            
-            # 2. Compute KNN Purity
-            # returns 0 to 1
-            purity_score = compute_knn_purity(X_pair, y_pair, c1, k=k)
-            
-            results_pairwise['silhouette'][c1][c2] = sil_score
-            results_pairwise['purity'][c1][c2] = purity_score
-
+    
+    if run_pairwise:
+        for c2 in range(len(embeds_val)):
+            for c1 in range(len(embeds_val)):
+                print(f"({c2}, {c1})")
+                # Create mask for only the two current classes
+                mask = (y == c1) | (y == c2)
+                
+                X_pair = X[mask]
+                y_pair = y[mask]
+                
+                # 1. Compute Silhouette Score (Requires at least 2 distinct labels)
+                # returns -1 (wrong cluster) to +1 (dense, well separated)
+                sil_score = silhouette_samples(X_pair, y_pair)[y_pair == c1].mean() if c1 != c2 else 1.0
+                
+                # 2. Compute KNN Purity
+                # returns 0 to 1
+                purity_score = compute_knn_purity(X_pair, y_pair, c1, k=k)
+                
+                results_pairwise['silhouette'][c1][c2] = sil_score
+                results_pairwise['purity'][c1][c2] = purity_score
+    '''
     sil_score = silhouette_samples(X, y)
     purity_score = compute_knn_purity(X, y, None, k=k)
     for tgt_cls in classes:
