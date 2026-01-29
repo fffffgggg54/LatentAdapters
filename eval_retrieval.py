@@ -14,7 +14,8 @@ out_dir = "outputs/final_mmID_4096_10epoch_discriminator1.0_latent1.0_MSE_JointT
 adapter_hidden_dim = 4096
 epoch = 9
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = "cpu"
 autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 '''
 model_names = [
@@ -255,7 +256,7 @@ def main():
             all_latents.append(latents)
     all_latents = torch.cat(all_latents, dim=1)
     all_latents_normalized = F.normalize(all_latents, p=2, dim=-1)
-    all_latents_normalized = all_latents_normalized.to('cpu', non_blocking=True)
+    #all_latents_normalized = all_latents_normalized.to('cpu', non_blocking=True)
     
     n_models = len(model_names)
     r1_matrix = np.zeros((n_models, n_models))
@@ -323,7 +324,7 @@ def main():
         # out_model, in_model, batch_idx, dim
         all_adapted_embeds = adapter.fw_latent_to_all_embeds(all_latents)
         all_adapted_embeds_normalized = [F.normalize(x, p=2, dim=-1) for x in all_adapted_embeds]
-        all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
+        #all_adapted_embeds_normalized = all_adapted_embeds_normalized.to('cpu', non_blocking=True)
         
         embeds_val_normalized = [F.normalize(x.to(device, non_blocking=True).float(), p=2, dim=-1) for x in embeds_val]
     
